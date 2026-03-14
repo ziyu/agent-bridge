@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Guest App (Iframe Mode)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 16px; transition: background .3s, color .3s; }
+    body.dark { background: #1e1e2e; color: #cdd6f4; }
+    body.light { background: #ffffff; color: #333; }
+    h3 { margin-bottom: 8px; }
+    #status { color: #888; margin-bottom: 8px; }
+    #theme-label { font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body class="light">
+  <h3>Guest App (iframe)</h3>
+  <div id="status">Connecting to host...</div>
+  <div id="theme-label">Theme: light</div>
+
+  <script type="module">
+    import { BridgeClient } from '../../packages/client/dist/index.mjs';
+
+    const client = new BridgeClient();
+    let currentTheme = 'light';
+
+    client.registerAction(
+      'getTime',
+      'Get the current time in a given timezone',
+      {
+        type: 'object',
+        properties: {
+          timezone: { type: 'string', description: 'IANA timezone string (e.g. "UTC", "America/New_York")' }
+        },
+        required: ['timezone'],
+      },
+      (params) => {
+        const now = new Date();
+        const formatted = now.toLocaleString('en-US', { timeZone: params.timezone });
+        return { time: formatted, timezone: params.timezone };
+      }
+    );
+
+    client.registerAction(
+      'toggleTheme',
+      'Toggle between light and dark theme',
+      {
+        type: 'object',
+        properties: {},
+      },
+      () => {
+        currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.body.className = currentTheme;
+        document.getElementById('theme-label').textContent = 'Theme: ' + currentTheme;
+        client.syncState({ theme: currentTheme });
+        return { theme: currentTheme };
+      }
+    );
+
+    client.initialize().then(() => {
+      document.getElementById('status').textContent = 'Connected to host!';
+      client.notifyHost('ready', { actions: ['getTime', 'toggleTheme'] });
+      client.syncState({ theme: currentTheme });
+    });
+  </script>
+</body>
+</html>

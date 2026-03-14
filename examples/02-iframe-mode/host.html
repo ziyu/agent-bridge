@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge - Iframe Mode (Host)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; }
+    h1 { margin-bottom: 8px; }
+    p.desc { color: #666; margin-bottom: 24px; }
+    .panel { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .panel h2 { font-size: 14px; color: #999; text-transform: uppercase; margin-bottom: 12px; }
+    #sandbox-container { width: 100%; height: 240px; border: 2px dashed #ddd; border-radius: 8px; overflow: hidden; }
+    #sandbox-container iframe { border: none; }
+    #log { font-family: monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+    #log div { padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+    .log-host { color: #2563eb; }
+    .log-guest { color: #16a34a; }
+    .log-error { color: #dc2626; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+    button:hover { background: #f0f0f0; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>02 - Iframe Mode</h1>
+  <p class="desc">Host mounts a remote guest app via iframe URL. The guest page (guest.html) must include the Client SDK independently.</p>
+
+  <div class="panel">
+    <h2>Controls</h2>
+    <div>
+      <button id="btn-mount">Mount Guest (iframe)</button>
+      <button id="btn-get-time" disabled>Call getTime()</button>
+      <button id="btn-toggle" disabled>Call toggleTheme()</button>
+      <button id="btn-unmount" disabled>Unmount</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Sandbox (iframe)</h2>
+    <div id="sandbox-container"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import { AgentBridgeHost } from '../../packages/host/dist/index.mjs';
+
+    const log = document.getElementById('log');
+    const btnMount = document.getElementById('btn-mount');
+    const btnGetTime = document.getElementById('btn-get-time');
+    const btnToggle = document.getElementById('btn-toggle');
+    const btnUnmount = document.getElementById('btn-unmount');
+
+    function addLog(msg, cls = 'log-host') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(d);
+    }
+
+    const host = new AgentBridgeHost();
+    let connectionId = null;
+
+    btnMount.addEventListener('click', async () => {
+      try {
+        addLog('Mounting guest via iframe (guest.html)...');
+        btnMount.disabled = true;
+
+        const conn = await host.mount(
+          { type: 'uri', url: './guest.html' },
+          {
+            container: document.getElementById('sandbox-container'),
+            allowedOrigins: ['*'],
+          }
+        );
+        connectionId = conn.id;
+        addLog('Connected! id=' + connectionId);
+
+        conn.on('capabilities', (caps) => {
+          addLog('Guest capabilities: ' + caps.map(c => c.name).join(', '));
+          btnGetTime.disabled = false;
+          btnToggle.disabled = false;
+        });
+
+        conn.on('notification', (evt) => {
+          addLog(`Notification [${evt.eventName}]: ${JSON.stringify(evt.eventData)}`, 'log-guest');
+        });
+
+        conn.on('stateSync', (snapshot) => {
+          addLog('State: ' + JSON.stringify(snapshot), 'log-guest');
+        });
+
+        btnUnmount.disabled = false;
+      } catch (err) {
+        addLog('Mount failed: ' + err.message, 'log-error');
+        btnMount.disabled = false;
+      }
+    });
+
+    btnGetTime.addEventListener('click', async () => {
+      try {
+        addLog('Calling getTime({ timezone: "UTC" })...');
+        const result = await host.executeAction(connectionId, 'getTime', { timezone: 'UTC' });
+        addLog('Result: ' + JSON.stringify(result));
+      } catch (err) {
+        addLog('Error: ' + err.message, 'log-error');
+      }
+    });
+
+    btnToggle.addEventListener('click', async () => {
+      try {
+        addLog('Calling toggleTheme()...');
+        const result = await host.executeAction(connectionId, 'toggleTheme', {});
+        addLog('Result: ' + JSON.stringify(result));
+      } catch (err) {
+        addLog('Error: ' + err.message, 'log-error');
+      }
+    });
+
+    btnUnmount.addEventListener('click', () => {
+      host.unmount(connectionId);
+      connectionId = null;
+      addLog('Guest unmounted');
+      btnMount.disabled = false;
+      btnGetTime.disabled = true;
+      btnToggle.disabled = true;
+      btnUnmount.disabled = true;
+    });
+  </script>
+</body>
+</html>
