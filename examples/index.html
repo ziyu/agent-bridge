@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge SDK - Examples</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 48px 24px; background: #f5f5f5; max-width: 720px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; font-size: 28px; }
+    p.subtitle { color: #666; margin-bottom: 32px; line-height: 1.5; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); text-decoration: none; display: block; color: inherit; transition: box-shadow .2s, transform .1s; }
+    .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.15); transform: translateY(-1px); }
+    .card h2 { font-size: 18px; margin-bottom: 6px; }
+    .card p { color: #666; font-size: 14px; line-height: 1.5; }
+    .card .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 10px; margin-right: 6px; font-weight: 500; }
+    .tag-inline { background: #dcfce7; color: #166534; }
+    .tag-iframe { background: #dbeafe; color: #1e40af; }
+    .tag-llm { background: #f3e8ff; color: #6b21a8; }
+    .tag-host { background: #fef3c7; color: #92400e; }
+    .tag-client { background: #e0f2fe; color: #075985; }
+    .footer { margin-top: 32px; color: #999; font-size: 13px; }
+    .footer code { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>AgentBridge SDK Examples</h1>
+  <p class="subtitle">Interactive demos showing how to use @agent-bridge/host and @agent-bridge/client to mount guest apps and establish bidirectional communication.</p>
+
+  <a class="card" href="./01-basic-inline/index.html">
+    <h2>01 - Basic Inline Mode</h2>
+    <p>Host mounts a guest app via raw code injection (srcdoc). Guest registers greet and add actions, host calls them. Demonstrates the simplest integration path.</p>
+    <span class="tag tag-inline">Inline / Raw</span>
+    <span class="tag tag-host">Host SDK</span>
+    <span class="tag tag-client">Client SDK (IIFE)</span>
+  </a>
+
+  <a class="card" href="./02-iframe-mode/host.html">
+    <h2>02 - Iframe Mode</h2>
+    <p>Host mounts a separate guest page via iframe URL. Guest provides getTime and toggleTheme actions. Shows how independently deployed apps communicate.</p>
+    <span class="tag tag-iframe">Iframe / URI</span>
+    <span class="tag tag-host">Host SDK</span>
+    <span class="tag tag-client">Client SDK (ESM)</span>
+  </a>
+
+  <a class="card" href="./03-llm-tool-calling/index.html">
+    <h2>03 - LLM Tool-Calling Integration</h2>
+    <p>Full AI agent loop: guest registers weather capabilities → host converts to OpenAI/Anthropic/Gemini tool format → simulated LLM returns tool_calls → host routes actions back to guest.</p>
+    <span class="tag tag-llm">LLM Integration</span>
+    <span class="tag tag-inline">Inline / Raw</span>
+    <span class="tag tag-host">Host SDK</span>
+  </a>
+
+  <div class="footer">
+    Run with <code>pnpm run examples</code> or <code>npx serve .</code> from the repo root.
+  </div>
+</body>
+</html>
