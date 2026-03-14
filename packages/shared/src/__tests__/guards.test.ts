@@ -8,6 +8,7 @@ import {
   isReplyMessage,
   isNotifyMessage,
   isStateSyncMessage,
+  isCapabilitiesUpdateMessage,
   isDestroyMessage,
   NAMESPACE,
 } from '../index.js';
@@ -38,13 +39,13 @@ describe('guards', () => {
   });
 
   it('accepts valid ACK1 message', () => {
-    const msg = { ...base, type: 'ACK1', capabilities: [] };
+    const msg = { ...base, type: 'ACK1' };
     expect(isValidBridgeMessage(msg)).toBe(true);
     expect(isAck1Message(msg as any)).toBe(true);
   });
 
   it('accepts valid ACK2 message', () => {
-    const msg = { ...base, type: 'ACK2' };
+    const msg = { ...base, type: 'ACK2', capabilities: [] };
     expect(isValidBridgeMessage(msg)).toBe(true);
     expect(isAck2Message(msg as any)).toBe(true);
   });
@@ -77,5 +78,12 @@ describe('guards', () => {
     const msg = { ...base, type: 'DESTROY' };
     expect(isValidBridgeMessage(msg)).toBe(true);
     expect(isDestroyMessage(msg as any)).toBe(true);
+  });
+
+  it('accepts valid CAPABILITIES_UPDATE message', () => {
+    const msg = { ...base, type: 'CAPABILITIES_UPDATE', capabilities: [{ name: 'act', description: 'desc', parameters: { type: 'object', properties: {} } }] };
+    expect(isValidBridgeMessage(msg)).toBe(true);
+    expect(isCapabilitiesUpdateMessage(msg as any)).toBe(true);
+    expect(isDestroyMessage(msg as any)).toBe(false);
   });
 });

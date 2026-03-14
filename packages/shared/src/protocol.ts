@@ -39,11 +39,11 @@ export type SynMessage = MessageBase & {
 
 export type Ack1Message = MessageBase & {
   type: 'ACK1';
-  capabilities: ActionSchema[];
 };
 
 export type Ack2Message = MessageBase & {
   type: 'ACK2';
+  capabilities: ActionSchema[];
 };
 
 // Runtime
@@ -75,6 +75,11 @@ export type StateSyncMessage = MessageBase & {
   snapshot: Record<string, unknown>;
 };
 
+export type CapabilitiesUpdateMessage = MessageBase & {
+  type: 'CAPABILITIES_UPDATE';
+  capabilities: ActionSchema[];
+};
+
 export type DestroyMessage = MessageBase & {
   type: 'DESTROY';
 };
@@ -88,6 +93,7 @@ export type BridgeMessage =
   | ReplyMessage
   | NotifyMessage
   | StateSyncMessage
+  | CapabilitiesUpdateMessage
   | DestroyMessage;
 
 export type BridgeMessageType = BridgeMessage['type'];

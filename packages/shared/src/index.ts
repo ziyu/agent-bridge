@@ -9,6 +9,7 @@ export type {
   ReplyMessage,
   NotifyMessage,
   StateSyncMessage,
+  CapabilitiesUpdateMessage,
   DestroyMessage,
   BridgeMessage,
   BridgeMessageType,
@@ -28,6 +29,7 @@ export {
   isReplyMessage,
   isNotifyMessage,
   isStateSyncMessage,
+  isCapabilitiesUpdateMessage,
   isDestroyMessage,
 } from './guards.js';
 export { toOpenAITool, toAnthropicTool, toGeminiTool } from './schema.js';

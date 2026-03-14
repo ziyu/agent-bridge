@@ -8,6 +8,7 @@ import type {
   ReplyMessage,
   NotifyMessage,
   StateSyncMessage,
+  CapabilitiesUpdateMessage,
   DestroyMessage,
 } from './protocol.js';
 
@@ -48,6 +49,10 @@ export function isNotifyMessage(msg: BridgeMessage): msg is NotifyMessage {
 
 export function isStateSyncMessage(msg: BridgeMessage): msg is StateSyncMessage {
   return msg.type === 'STATE_SYNC';
+}
+
+export function isCapabilitiesUpdateMessage(msg: BridgeMessage): msg is CapabilitiesUpdateMessage {
+  return msg.type === 'CAPABILITIES_UPDATE';
 }
 
 export function isDestroyMessage(msg: BridgeMessage): msg is DestroyMessage {
