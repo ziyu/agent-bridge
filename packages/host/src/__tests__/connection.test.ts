@@ -77,14 +77,47 @@ describe('Connection', () => {
       namespace: NAMESPACE,
       channel: 'conn-1',
       timestamp: Date.now(),
-      capabilities: [{ name: 'test_action', description: 'A test', parameters: { type: 'object', properties: {} } }],
     });
 
     await handshakePromise;
     expect(conn.getState()).toBe('connected');
     expect(stateChanges.some((e: any) => e.current === 'connected')).toBe(true);
+    expect(conn.getCapabilities()).toHaveLength(0);
+
+    conn.destroy();
+  });
+
+  it('receives capabilities from ACK2 when host is leader', async () => {
+    const sandbox = createMockSandbox();
+    const conn = new Connection('conn-1', sandbox);
+    const capEvents: any[] = [];
+    conn.on('capabilities', (caps) => capEvents.push(caps));
+
+    const mockTargetWindow = { postMessage: vi.fn() } as any;
+    const handshakePromise = conn.handshake(mockTargetWindow, ['*'], 5000);
+
+    dispatchBridgeMessage({
+      type: 'SYN',
+      namespace: NAMESPACE,
+      channel: 'conn-1',
+      timestamp: Date.now(),
+      participantId: 'aaa-guest-id',
+      protocolVersion: '1.0',
+    });
+
+    dispatchBridgeMessage({
+      type: 'ACK2',
+      namespace: NAMESPACE,
+      channel: 'conn-1',
+      timestamp: Date.now(),
+      capabilities: [{ name: 'test_action', description: 'A test', parameters: { type: 'object', properties: {} } }],
+    });
+
+    await handshakePromise;
+    expect(conn.getState()).toBe('connected');
     expect(conn.getCapabilities()).toHaveLength(1);
     expect(conn.getCapabilities()[0].name).toBe('test_action');
+    expect(capEvents).toHaveLength(1);
 
     conn.destroy();
   });

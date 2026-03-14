@@ -5,7 +5,7 @@ import type {
   ConnectionStateEvent,
   NotificationEvent,
   ReplyMessage,
-  Ack1Message,
+  Ack2Message,
 } from '@agent-bridge/shared';
 import {
   NAMESPACE,
@@ -19,6 +19,7 @@ import {
   isReplyMessage,
   isNotifyMessage,
   isStateSyncMessage,
+  isCapabilitiesUpdateMessage,
   isDestroyMessage,
 } from '@agent-bridge/shared';
 import type { Sandbox } from './sandbox/types.js';
@@ -104,11 +105,11 @@ export class Connection {
             this.sendAck1();
           }
         } else if (isAck1Message(msg)) {
-          this.capabilities = (msg as Ack1Message).capabilities;
-          this.emit('capabilities', this.capabilities);
-          this.finishHandshake(timer, cleanup, resolve);
           this.sendAck2WithPort();
+          this.finishHandshake(timer, cleanup, resolve);
         } else if (isAck2Message(msg)) {
+          this.capabilities = (msg as Ack2Message).capabilities;
+          this.emit('capabilities', this.capabilities);
           this.finishHandshake(timer, cleanup, resolve);
         }
       });
@@ -137,6 +138,7 @@ export class Connection {
         namespace: NAMESPACE,
         channel: this.id,
         timestamp: Date.now(),
+        capabilities: [],
       },
       [port2],
     );
@@ -179,6 +181,9 @@ export class Connection {
 
       if (isReplyMessage(msg)) {
         this.handleReply(msg as ReplyMessage);
+      } else if (isCapabilitiesUpdateMessage(msg)) {
+        this.capabilities = msg.capabilities;
+        this.emit('capabilities', this.capabilities);
       } else if (isNotifyMessage(msg)) {
         this.emit('notification', {
           eventName: msg.eventName,
@@ -257,7 +262,6 @@ export class Connection {
       namespace: NAMESPACE,
       channel: this.id,
       timestamp: Date.now(),
-      capabilities: [],
     });
   }
 
