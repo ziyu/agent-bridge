@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge - LLM Tool-Calling Integration</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; }
+    h1 { margin-bottom: 8px; }
+    p.desc { color: #666; margin-bottom: 24px; line-height: 1.5; }
+    .panel { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .panel h2 { font-size: 14px; color: #999; text-transform: uppercase; margin-bottom: 12px; }
+    #sandbox-container { width: 100%; height: 160px; border: 2px dashed #ddd; border-radius: 8px; overflow: hidden; }
+    #sandbox-container iframe { border: none; }
+    pre { background: #1e1e2e; color: #cdd6f4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+    #log { font-family: monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+    #log div { padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+    .log-host { color: #2563eb; }
+    .log-llm { color: #9333ea; }
+    .log-guest { color: #16a34a; }
+    .log-error { color: #dc2626; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+    button:hover { background: #f0f0f0; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .flow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .flow-step { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+    .flow-arrow { color: #999; }
+  </style>
+</head>
+<body>
+  <h1>03 - LLM Tool-Calling Integration</h1>
+  <p class="desc">
+    Demonstrates the full AI agent loop: Guest registers capabilities → Host converts them to
+    OpenAI/Anthropic/Gemini tool format → Simulated LLM returns tool_calls → Host routes actions
+    back to the guest app.
+  </p>
+
+  <div class="panel">
+    <h2>Flow</h2>
+    <div class="flow">
+      <div class="flow-step">1. Guest registers actions</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">2. Host converts to OpenAI tools</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">3. LLM returns tool_calls</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">4. Host executes on guest</div>
+    </div>
+    <div>
+      <button id="btn-mount">1. Mount Guest</button>
+      <button id="btn-show-tools" disabled>2. Show OpenAI Tools</button>
+      <button id="btn-simulate" disabled>3. Simulate LLM Call</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Sandbox</h2>
+    <div id="sandbox-container"></div>
+  </div>
+
+  <div class="panel">
+    <h2>OpenAI Tool Definitions (generated from guest capabilities)</h2>
+    <pre id="tools-json">Mount a guest first to see tool definitions...</pre>
+  </div>
+
+  <div class="panel">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import { AgentBridgeHost } from '../../packages/host/dist/index.mjs';
+    import { toOpenAITool, toAnthropicTool, toGeminiTool } from '../../packages/shared/dist/index.mjs';
+
+    const log = document.getElementById('log');
+    const toolsJson = document.getElementById('tools-json');
+    const btnMount = document.getElementById('btn-mount');
+    const btnShowTools = document.getElementById('btn-show-tools');
+    const btnSimulate = document.getElementById('btn-simulate');
+
+    function addLog(msg, cls = 'log-host') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(d);
+    }
+
+    const host = new AgentBridgeHost();
+    let connectionId = null;
+    let openAITools = [];
+
+    const guestCode = `
+<!DOCTYPE html>
+<html>
+<head><style>
+  body { font-family: system-ui, sans-serif; padding: 12px; background: #faf5ff; }
+  h3 { color: #9333ea; margin-bottom: 4px; font-size: 14px; }
+  .info { color: #666; font-size: 12px; }
+</style></head>
+<body>
+  <h3>AI-Powered Weather Widget</h3>
+  <div class="info" id="status">Registering capabilities...</div>
+  <div class="info" id="last-call"></div>
+  <script>
+    const client = new AgentBridgeClient.BridgeClient();
+
+    client.registerAction(
+      'getWeather',
+      'Get current weather for a city. Returns temperature, condition, and humidity.',
+      {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: 'City name (e.g. "San Francisco")' },
+          units: { type: 'string', description: 'Temperature units', enum: ['celsius', 'fahrenheit'] }
+        },
+        required: ['city'],
+      },
+      (params) => {
+        const temps = { 'San Francisco': 18, 'Tokyo': 24, 'London': 12, 'New York': 22 };
+        const temp = temps[params.city] || Math.floor(Math.random() * 30);
+        const unit = params.units === 'fahrenheit' ? 'F' : 'C';
+        const tempVal = params.units === 'fahrenheit' ? Math.round(temp * 9/5 + 32) : temp;
+        document.getElementById('last-call').textContent = 'Last: getWeather(' + params.city + ')';
+        return { city: params.city, temperature: tempVal, unit, condition: 'partly cloudy', humidity: 65 };
+      }
+    );
+
+    client.registerAction(
+      'getForecast',
+      'Get 3-day weather forecast for a city.',
+      {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: 'City name' },
+          days: { type: 'integer', description: 'Number of forecast days (1-7)', enum: ['1','2','3','4','5','6','7'] }
+        },
+        required: ['city'],
+      },
+      (params) => {
+        const days = params.days || 3;
+        const forecast = Array.from({ length: days }, (_, i) => ({
+          day: 'Day ' + (i + 1),
+          high: 20 + Math.floor(Math.random() * 10),
+          low: 10 + Math.floor(Math.random() * 8),
+          condition: ['sunny', 'cloudy', 'rainy', 'partly cloudy'][Math.floor(Math.random() * 4)]
+        }));
+        document.getElementById('last-call').textContent = 'Last: getForecast(' + params.city + ', ' + days + 'd)';
+        return { city: params.city, forecast };
+      }
+    );
+
+    client.initialize().then(() => {
+      document.getElementById('status').textContent = '2 capabilities registered. Ready for LLM calls.';
+    });
+  <\/script>
+</body>
+</html>`;
+
+    btnMount.addEventListener('click', async () => {
+      try {
+        addLog('Mounting AI weather widget...');
+        btnMount.disabled = true;
+
+        const conn = await host.mount(
+          { type: 'raw', code: guestCode, codeType: 'html' },
+          { container: document.getElementById('sandbox-container') }
+        );
+        connectionId = conn.id;
+        addLog('Guest connected');
+
+        conn.on('capabilities', (caps) => {
+          addLog('Capabilities received: ' + caps.map(c => c.name).join(', '));
+
+          openAITools = caps.map(toOpenAITool);
+          addLog('Converted ' + openAITools.length + ' capabilities to OpenAI tool format', 'log-llm');
+
+          btnShowTools.disabled = false;
+          btnSimulate.disabled = false;
+        });
+      } catch (err) {
+        addLog('Mount failed: ' + err.message, 'log-error');
+        btnMount.disabled = false;
+      }
+    });
+
+    btnShowTools.addEventListener('click', () => {
+      const caps = host.getCapabilities(connectionId);
+
+      const openai = caps.map(toOpenAITool);
+      const anthropic = caps.map(toAnthropicTool);
+      const gemini = caps.map(toGeminiTool);
+
+      toolsJson.textContent =
+        '// OpenAI format (tools parameter)\n' +
+        JSON.stringify(openai, null, 2) +
+        '\n\n// Anthropic format (tools parameter)\n' +
+        JSON.stringify(anthropic, null, 2) +
+        '\n\n// Gemini format (function_declarations)\n' +
+        JSON.stringify(gemini, null, 2);
+    });
+
+    btnSimulate.addEventListener('click', async () => {
+      addLog('Sending tools to simulated LLM...', 'log-llm');
+      addLog('LLM prompt: "What\'s the weather in San Francisco and a 3-day forecast for Tokyo?"', 'log-llm');
+
+      // Simulated LLM response with tool_calls (mimics OpenAI chat completion)
+      const simulatedResponse = {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call_1',
+                type: 'function',
+                function: {
+                  name: 'getWeather',
+                  arguments: JSON.stringify({ city: 'San Francisco', units: 'fahrenheit' })
+                }
+              },
+              {
+                id: 'call_2',
+                type: 'function',
+                function: {
+                  name: 'getForecast',
+                  arguments: JSON.stringify({ city: 'Tokyo', days: 3 })
+                }
+              }
+            ]
+          }
+        }]
+      };
+
+      addLog('LLM returned ' + simulatedResponse.choices[0].message.tool_calls.length + ' tool_calls', 'log-llm');
+
+      // Route each tool_call back to the guest via executeAction
+      const toolCalls = simulatedResponse.choices[0].message.tool_calls;
+      const results = [];
+
+      for (const call of toolCalls) {
+        const args = JSON.parse(call.function.arguments);
+        addLog(`Executing: ${call.function.name}(${JSON.stringify(args)})...`);
+
+        try {
+          const result = await host.executeAction(connectionId, call.function.name, args);
+          results.push({ tool_call_id: call.id, role: 'tool', content: JSON.stringify(result) });
+          addLog(`Result [${call.function.name}]: ${JSON.stringify(result)}`, 'log-guest');
+        } catch (err) {
+          results.push({ tool_call_id: call.id, role: 'tool', content: JSON.stringify({ error: err.message }) });
+          addLog(`Error [${call.function.name}]: ${err.message}`, 'log-error');
+        }
+      }
+
+      addLog('All tool results collected. Would send back to LLM for final response.', 'log-llm');
+      addLog('Tool results: ' + JSON.stringify(results), 'log-llm');
+    });
+  </script>
+</body>
+</html>
