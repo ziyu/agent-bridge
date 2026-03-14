@@ -2,13 +2,13 @@ import type {
   ActionSchema,
   BridgeMessage,
   CallMessage,
-  Ack1Message,
 } from '@agent-bridge/shared';
 import {
   NAMESPACE,
   PROTOCOL_VERSION,
   BridgeError,
   isSynMessage,
+  isAck1Message,
   isAck2Message,
   isCallMessage,
   isDestroyMessage,
@@ -54,9 +54,7 @@ export class BridgeClient {
           if (isLeader) {
             this.sendAck1();
           }
-        } else if (msg.type === 'ACK1') {
-          const ack1 = msg as Ack1Message;
-          void ack1;
+        } else if (isAck1Message(msg)) {
           this.sendAck2();
           this.onConnected();
           cleanup();
@@ -80,6 +78,10 @@ export class BridgeClient {
   ): void {
     const schema: ActionSchema = { name, description, parameters: parameterSchema };
     this.actions.set(name, { schema, callback });
+
+    if (this.connected && this.transport) {
+      this.sendCapabilitiesUpdate();
+    }
   }
 
   notifyHost(
@@ -133,6 +135,7 @@ export class BridgeClient {
     this.connected = true;
     this.setupRuntimeHandlers();
     this.queue.flush((msg) => this.transport!.send(msg));
+    this.sendCapabilitiesUpdate();
   }
 
   private setupRuntimeHandlers(): void {
@@ -211,9 +214,18 @@ export class BridgeClient {
   }
 
   private sendAck1(): void {
-    const capabilities = Array.from(this.actions.values()).map((a) => a.schema);
     this.transport?.sendViaWindow({
       type: 'ACK1',
+      namespace: NAMESPACE,
+      channel: this.channel,
+      timestamp: Date.now(),
+    });
+  }
+
+  private sendAck2(): void {
+    const capabilities = this.getCapabilitiesSnapshot();
+    this.transport?.sendViaWindow({
+      type: 'ACK2',
       namespace: NAMESPACE,
       channel: this.channel,
       timestamp: Date.now(),
@@ -221,13 +233,18 @@ export class BridgeClient {
     });
   }
 
-  private sendAck2(): void {
-    this.transport?.sendViaWindow({
-      type: 'ACK2',
+  private sendCapabilitiesUpdate(): void {
+    this.transport?.send({
+      type: 'CAPABILITIES_UPDATE',
       namespace: NAMESPACE,
       channel: this.channel,
       timestamp: Date.now(),
+      capabilities: this.getCapabilitiesSnapshot(),
     });
+  }
+
+  private getCapabilitiesSnapshot(): ActionSchema[] {
+    return Array.from(this.actions.values()).map((a) => a.schema);
   }
 
   private generateId(): string {
