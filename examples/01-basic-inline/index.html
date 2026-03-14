@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge - Basic Inline Example</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; }
+    h1 { margin-bottom: 8px; }
+    p.desc { color: #666; margin-bottom: 24px; }
+    .panel { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .panel h2 { font-size: 14px; color: #999; text-transform: uppercase; margin-bottom: 12px; }
+    #sandbox-container { width: 100%; height: 200px; border: 2px dashed #ddd; border-radius: 8px; overflow: hidden; }
+    #sandbox-container iframe { border: none; }
+    #log { font-family: monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+    #log div { padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+    .log-host { color: #2563eb; }
+    .log-guest { color: #16a34a; }
+    .log-error { color: #dc2626; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+    button:hover { background: #f0f0f0; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .actions { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>01 - Basic Inline Mode</h1>
+  <p class="desc">Host mounts a guest app via raw code injection. Guest registers actions, host calls them.</p>
+
+  <div class="panel">
+    <h2>Controls</h2>
+    <div class="actions">
+      <button id="btn-mount">Mount Guest</button>
+      <button id="btn-greet" disabled>Call greet()</button>
+      <button id="btn-add" disabled>Call add(2, 3)</button>
+      <button id="btn-unmount" disabled>Unmount</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Sandbox</h2>
+    <div id="sandbox-container"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <!-- Host SDK (ESM) -->
+  <script type="module">
+    import { AgentBridgeHost } from '../../packages/host/dist/index.mjs';
+    import { toOpenAITool } from '../../packages/shared/dist/index.mjs';
+
+    const log = document.getElementById('log');
+    const btnMount = document.getElementById('btn-mount');
+    const btnGreet = document.getElementById('btn-greet');
+    const btnAdd = document.getElementById('btn-add');
+    const btnUnmount = document.getElementById('btn-unmount');
+
+    function addLog(msg, cls = 'log-host') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(d);
+    }
+
+    const host = new AgentBridgeHost();
+    let connectionId = null;
+
+    // Guest app code — will be injected into iframe via srcdoc
+    const guestCode = `
+<!DOCTYPE html>
+<html>
+<head><style>
+  body { font-family: system-ui, sans-serif; padding: 16px; background: #f0fdf4; }
+  h3 { color: #16a34a; margin-bottom: 8px; }
+  #status { color: #666; }
+</style></head>
+<body>
+  <h3>Guest App</h3>
+  <div id="status">Initializing...</div>
+  <script>
+    // BridgeClient is injected automatically by InlineSandbox via IIFE bundle
+    const client = new AgentBridgeClient.BridgeClient();
+
+    // Register actions BEFORE initialize (they'll be sent during handshake)
+    client.registerAction(
+      'greet',
+      'Greet a person by name',
+      {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the person to greet' }
+        },
+        required: ['name'],
+      },
+      (params) => {
+        return { message: 'Hello, ' + params.name + '!' };
+      }
+    );
+
+    client.registerAction(
+      'add',
+      'Add two numbers together',
+      {
+        type: 'object',
+        properties: {
+          a: { type: 'number', description: 'First number' },
+          b: { type: 'number', description: 'Second number' }
+        },
+        required: ['a', 'b'],
+      },
+      (params) => {
+        return { result: params.a + params.b };
+      }
+    );
+
+    client.initialize().then(() => {
+      document.getElementById('status').textContent = 'Connected to host!';
+      // Notify host that we're ready
+      client.notifyHost('ready', { timestamp: Date.now() });
+      // Sync initial state
+      client.syncState({ actionsRegistered: 2, status: 'ready' });
+    });
+  <\/script>
+</body>
+</html>`;
+
+    btnMount.addEventListener('click', async () => {
+      try {
+        addLog('Mounting guest app (inline/raw mode)...');
+        btnMount.disabled = true;
+
+        const conn = await host.mount(
+          { type: 'raw', code: guestCode, codeType: 'html' },
+          { container: document.getElementById('sandbox-container') }
+        );
+        connectionId = conn.id;
+        addLog('Guest mounted! Connection: ' + connectionId);
+
+        // Listen for events from guest
+        conn.on('capabilities', (caps) => {
+          addLog('Capabilities registered: ' + caps.map(c => c.name).join(', '));
+          addLog('As OpenAI tools: ' + JSON.stringify(caps.map(toOpenAITool).map(t => t.function.name)));
+          btnGreet.disabled = false;
+          btnAdd.disabled = false;
+        });
+
+        conn.on('notification', (evt) => {
+          addLog('Notification: ' + evt.eventName + ' → ' + JSON.stringify(evt.eventData), 'log-guest');
+        });
+
+        conn.on('stateSync', (snapshot) => {
+          addLog('State sync: ' + JSON.stringify(snapshot), 'log-guest');
+        });
+
+        btnUnmount.disabled = false;
+      } catch (err) {
+        addLog('Mount failed: ' + err.message, 'log-error');
+        btnMount.disabled = false;
+      }
+    });
+
+    btnGreet.addEventListener('click', async () => {
+      try {
+        addLog('Calling greet({ name: "World" })...');
+        const result = await host.executeAction(connectionId, 'greet', { name: 'World' });
+        addLog('Result: ' + JSON.stringify(result));
+      } catch (err) {
+        addLog('Error: ' + err.message, 'log-error');
+      }
+    });
+
+    btnAdd.addEventListener('click', async () => {
+      try {
+        addLog('Calling add({ a: 2, b: 3 })...');
+        const result = await host.executeAction(connectionId, 'add', { a: 2, b: 3 });
+        addLog('Result: ' + JSON.stringify(result));
+      } catch (err) {
+        addLog('Error: ' + err.message, 'log-error');
+      }
+    });
+
+    btnUnmount.addEventListener('click', () => {
+      host.unmount(connectionId);
+      connectionId = null;
+      addLog('Guest unmounted');
+      btnMount.disabled = false;
+      btnGreet.disabled = true;
+      btnAdd.disabled = true;
+      btnUnmount.disabled = true;
+    });
+  </script>
+</body>
+</html>
