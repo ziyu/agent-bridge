@@ -28,12 +28,40 @@
   <p class="desc">Host mounts a guest app via raw code injection. Guest registers actions, host calls them.</p>
 
   <div class="panel">
+    <h2>Connection Status</h2>
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #999;" id="state-dot"></span>
+      <span id="state-text">Initializing...</span>
+    </div>
+    <table id="capabilities-table" style="display: none; width: 100%; font-size: 13px; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+          <th style="text-align: left; padding: 8px 0;">Action</th>
+          <th style="text-align: left; padding: 8px 0;">Description</th>
+        </tr>
+      </thead>
+      <tbody id="capabilities-body"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
     <h2>Controls</h2>
     <div class="actions">
-      <button id="btn-mount">Mount Guest</button>
+      <label style="display: block; margin-bottom: 12px;">
+        Greet Name:
+        <input type="text" id="greet-name" value="World" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; margin-left: 8px;" />
+      </label>
+      <label style="display: block; margin-bottom: 12px;">
+        Add Numbers:
+        <input type="number" id="add-a" value="2" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; margin-left: 8px; width: 80px;" />
+        +
+        <input type="number" id="add-b" value="3" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; margin-left: 8px; width: 80px;" />
+      </label>
+    </div>
+    <div class="actions">
       <button id="btn-greet" disabled>Call greet()</button>
-      <button id="btn-add" disabled>Call add(2, 3)</button>
-      <button id="btn-unmount" disabled>Unmount</button>
+      <button id="btn-add" disabled>Call add()</button>
+      <button id="btn-reconnect" style="display: none;">Reconnect</button>
     </div>
   </div>
 
@@ -53,10 +81,16 @@
     import { toOpenAITool } from '../../packages/shared/dist/index.mjs';
 
     const log = document.getElementById('log');
-    const btnMount = document.getElementById('btn-mount');
+    const greetNameInput = document.getElementById('greet-name');
+    const addAInput = document.getElementById('add-a');
+    const addBInput = document.getElementById('add-b');
     const btnGreet = document.getElementById('btn-greet');
     const btnAdd = document.getElementById('btn-add');
-    const btnUnmount = document.getElementById('btn-unmount');
+    const btnReconnect = document.getElementById('btn-reconnect');
+    const stateDot = document.getElementById('state-dot');
+    const stateText = document.getElementById('state-text');
+    const capabilitiesTable = document.getElementById('capabilities-table');
+    const capabilitiesBody = document.getElementById('capabilities-body');
 
     function addLog(msg, cls = 'log-host') {
       const d = document.createElement('div');
@@ -67,6 +101,27 @@
 
     const host = new AgentBridgeHost();
     let connectionId = null;
+
+    function updateStateIndicator(state) {
+      const colors = {
+        'disconnected': '#999',
+        'connecting': '#f59e0b',
+        'connected': '#16a34a'
+      };
+      stateDot.style.background = colors[state] || '#999';
+      stateText.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+    }
+
+    function showCapabilities(caps) {
+      capabilitiesBody.innerHTML = '';
+      caps.forEach(cap => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #f0f0f0';
+        row.innerHTML = `<td style="padding: 8px 0; text-align: left;">${cap.name}</td><td style="padding: 8px 0; text-align: left; color: #666;">${cap.description}</td>`;
+        capabilitiesBody.appendChild(row);
+      });
+      capabilitiesTable.style.display = 'table';
+    }
 
     // Guest app code — will be injected into iframe via srcdoc
     const guestCode = `
@@ -127,20 +182,25 @@
 </body>
 </html>`;
 
-    btnMount.addEventListener('click', async () => {
+    async function mountGuest() {
       try {
+        updateStateIndicator('connecting');
         addLog('Mounting guest app (inline/raw mode)...');
-        btnMount.disabled = true;
 
         const conn = await host.mount(
           { type: 'raw', code: guestCode, codeType: 'html' },
           { container: document.getElementById('sandbox-container') }
         );
         connectionId = conn.id;
+        updateStateIndicator('connected');
         addLog('Guest mounted! Connection: ' + connectionId);
 
-        // Listen for events from guest
+        conn.on('stateChange', (newState) => {
+          updateStateIndicator(newState);
+        });
+
         conn.on('capabilities', (caps) => {
+          showCapabilities(caps);
           addLog('Capabilities registered: ' + caps.map(c => c.name).join(', '));
           addLog('As OpenAI tools: ' + JSON.stringify(caps.map(toOpenAITool).map(t => t.function.name)));
           btnGreet.disabled = false;
@@ -155,17 +215,21 @@
           addLog('State sync: ' + JSON.stringify(snapshot), 'log-guest');
         });
 
-        btnUnmount.disabled = false;
+        btnReconnect.style.display = 'none';
       } catch (err) {
+        updateStateIndicator('disconnected');
         addLog('Mount failed: ' + err.message, 'log-error');
-        btnMount.disabled = false;
+        btnReconnect.style.display = 'inline-block';
       }
-    });
+    }
+
+    mountGuest();
 
     btnGreet.addEventListener('click', async () => {
       try {
-        addLog('Calling greet({ name: "World" })...');
-        const result = await host.executeAction(connectionId, 'greet', { name: 'World' });
+        const name = greetNameInput.value || 'World';
+        addLog(`Calling greet({ name: "${name}" })...`);
+        const result = await host.executeAction(connectionId, 'greet', { name: name });
         addLog('Result: ' + JSON.stringify(result));
       } catch (err) {
         addLog('Error: ' + err.message, 'log-error');
@@ -174,22 +238,23 @@
 
     btnAdd.addEventListener('click', async () => {
       try {
-        addLog('Calling add({ a: 2, b: 3 })...');
-        const result = await host.executeAction(connectionId, 'add', { a: 2, b: 3 });
+        const a = parseFloat(addAInput.value) || 0;
+        const b = parseFloat(addBInput.value) || 0;
+        addLog(`Calling add({ a: ${a}, b: ${b} })...`);
+        const result = await host.executeAction(connectionId, 'add', { a: a, b: b });
         addLog('Result: ' + JSON.stringify(result));
       } catch (err) {
         addLog('Error: ' + err.message, 'log-error');
       }
     });
 
-    btnUnmount.addEventListener('click', () => {
-      host.unmount(connectionId);
+    btnReconnect.addEventListener('click', () => {
       connectionId = null;
-      addLog('Guest unmounted');
-      btnMount.disabled = false;
       btnGreet.disabled = true;
       btnAdd.disabled = true;
-      btnUnmount.disabled = true;
+      capabilitiesTable.style.display = 'none';
+      addLog('Reconnecting...');
+      mountGuest();
     });
   </script>
 </body>
