@@ -9,20 +9,42 @@
     body.dark { background: #1e1e2e; color: #cdd6f4; }
     body.light { background: #ffffff; color: #333; }
     h3 { margin-bottom: 8px; }
-    #status { color: #888; margin-bottom: 8px; }
-    #theme-label { font-size: 13px; color: #aaa; }
+    #status { color: #888; margin-bottom: 12px; font-size: 13px; }
+    #clock { font-family: monospace; font-size: 24px; font-weight: bold; margin: 12px 0; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 6px; text-align: center; }
+    body.dark #clock { background: rgba(255,255,255,0.1); }
+    #theme-indicator { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 12px; background: rgba(0,0,0,0.05); border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); font-size: 13px; }
+    body.dark #theme-indicator { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+    #theme-icon { font-size: 20px; }
   </style>
 </head>
 <body class="light">
   <h3>Guest App (iframe)</h3>
   <div id="status">Connecting to host...</div>
-  <div id="theme-label">Theme: light</div>
+  <div id="clock">--:--:--</div>
+  <div id="theme-indicator">
+    <span id="theme-icon">☀️</span>
+    <span id="theme-label">light</span>
+  </div>
 
   <script type="module">
     import { BridgeClient } from '../../packages/client/dist/index.mjs';
 
     const client = new BridgeClient();
     let currentTheme = 'light';
+
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+    }
+
+    function updateThemeDisplay() {
+      const icon = currentTheme === 'light' ? '☀️' : '🌙';
+      document.getElementById('theme-icon').textContent = icon;
+      document.getElementById('theme-label').textContent = currentTheme;
+    }
 
     client.registerAction(
       'getTime',
@@ -51,16 +73,20 @@
       () => {
         currentTheme = currentTheme === 'light' ? 'dark' : 'light';
         document.body.className = currentTheme;
-        document.getElementById('theme-label').textContent = 'Theme: ' + currentTheme;
+        updateThemeDisplay();
         client.syncState({ theme: currentTheme });
         return { theme: currentTheme };
       }
     );
 
+    setInterval(updateClock, 1000);
+    updateClock();
+
     client.initialize().then(() => {
       document.getElementById('status').textContent = 'Connected to host!';
       client.notifyHost('ready', { actions: ['getTime', 'toggleTheme'] });
       client.syncState({ theme: currentTheme });
+      updateThemeDisplay();
     });
   </script>
 </body>

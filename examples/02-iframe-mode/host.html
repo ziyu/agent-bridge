@@ -20,6 +20,8 @@
     button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
     button:hover { background: #f0f0f0; }
     button:disabled { opacity: .5; cursor: not-allowed; }
+    input[type="text"] { font-family: system-ui, sans-serif; }
+    ul { list-style: disc; }
   </style>
 </head>
 <body>
@@ -28,11 +30,26 @@
 
   <div class="panel">
     <h2>Controls</h2>
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+      <span id="state-indicator" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
+        <span id="state-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ccc;"></span>
+        <span id="state-text">disconnected</span>
+      </span>
+    </div>
     <div>
       <button id="btn-mount">Mount Guest (iframe)</button>
       <button id="btn-get-time" disabled>Call getTime()</button>
       <button id="btn-toggle" disabled>Call toggleTheme()</button>
       <button id="btn-unmount" disabled>Unmount</button>
+      <button id="btn-reconnect" style="display: none;">Reconnect</button>
+    </div>
+    <div style="margin-top: 12px;">
+      <label style="display: block; margin-bottom: 6px; font-size: 13px;">Timezone for getTime():</label>
+      <input type="text" id="timezone-input" value="UTC" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 200px;">
+    </div>
+    <div id="capabilities-panel" style="margin-top: 12px; display: none; padding: 12px; background: #f9f9f9; border-left: 3px solid #2563eb; border-radius: 4px;">
+      <p style="font-size: 12px; color: #666; margin-bottom: 6px;">Available Capabilities:</p>
+      <ul id="capabilities-list" style="margin-left: 20px; font-size: 12px; color: #333;"></ul>
     </div>
   </div>
 
@@ -54,6 +71,12 @@
     const btnGetTime = document.getElementById('btn-get-time');
     const btnToggle = document.getElementById('btn-toggle');
     const btnUnmount = document.getElementById('btn-unmount');
+    const btnReconnect = document.getElementById('btn-reconnect');
+    const timezoneInput = document.getElementById('timezone-input');
+    const stateDot = document.getElementById('state-dot');
+    const stateText = document.getElementById('state-text');
+    const capabilitiesPanel = document.getElementById('capabilities-panel');
+    const capabilitiesList = document.getElementById('capabilities-list');
 
     function addLog(msg, cls = 'log-host') {
       const d = document.createElement('div');
@@ -62,12 +85,26 @@
       log.prepend(d);
     }
 
+    function updateStateIndicator(state) {
+      const colors = { connected: '#16a34a', connecting: '#f59e0b', disconnected: '#ccc' };
+      const labels = { connected: 'connected', connecting: 'connecting...', disconnected: 'disconnected' };
+      stateDot.style.background = colors[state] || colors.disconnected;
+      stateText.textContent = labels[state] || 'disconnected';
+    }
+
     const host = new AgentBridgeHost();
     let connectionId = null;
+
+    function autoMount() {
+      btnMount.click();
+    }
+
+    window.addEventListener('load', autoMount);
 
     btnMount.addEventListener('click', async () => {
       try {
         addLog('Mounting guest via iframe (guest.html)...');
+        updateStateIndicator('connecting');
         btnMount.disabled = true;
 
         const conn = await host.mount(
@@ -80,8 +117,23 @@
         connectionId = conn.id;
         addLog('Connected! id=' + connectionId);
 
+        conn.on('stateChange', (state) => {
+          if (state === 'connected') {
+            updateStateIndicator('connected');
+          } else if (state === 'disconnected') {
+            updateStateIndicator('disconnected');
+          }
+        });
+
         conn.on('capabilities', (caps) => {
           addLog('Guest capabilities: ' + caps.map(c => c.name).join(', '));
+          capabilitiesList.innerHTML = '';
+          caps.forEach(cap => {
+            const li = document.createElement('li');
+            li.textContent = cap.name;
+            capabilitiesList.appendChild(li);
+          });
+          capabilitiesPanel.style.display = 'block';
           btnGetTime.disabled = false;
           btnToggle.disabled = false;
         });
@@ -94,17 +146,21 @@
           addLog('State: ' + JSON.stringify(snapshot), 'log-guest');
         });
 
+        updateStateIndicator('connected');
         btnUnmount.disabled = false;
+        btnReconnect.style.display = 'none';
       } catch (err) {
         addLog('Mount failed: ' + err.message, 'log-error');
+        updateStateIndicator('disconnected');
         btnMount.disabled = false;
       }
     });
 
     btnGetTime.addEventListener('click', async () => {
       try {
-        addLog('Calling getTime({ timezone: "UTC" })...');
-        const result = await host.executeAction(connectionId, 'getTime', { timezone: 'UTC' });
+        const tz = timezoneInput.value || 'UTC';
+        addLog(`Calling getTime({ timezone: "${tz}" })...`);
+        const result = await host.executeAction(connectionId, 'getTime', { timezone: tz });
         addLog('Result: ' + JSON.stringify(result));
       } catch (err) {
         addLog('Error: ' + err.message, 'log-error');
@@ -125,10 +181,18 @@
       host.unmount(connectionId);
       connectionId = null;
       addLog('Guest unmounted');
+      updateStateIndicator('disconnected');
       btnMount.disabled = false;
       btnGetTime.disabled = true;
       btnToggle.disabled = true;
       btnUnmount.disabled = true;
+      btnReconnect.style.display = 'inline-block';
+      capabilitiesPanel.style.display = 'none';
+    });
+
+    btnReconnect.addEventListener('click', () => {
+      btnReconnect.style.display = 'none';
+      btnMount.click();
     });
   </script>
 </body>
