@@ -4,3 +4,16 @@ export { HostTransport } from './transport.js';
 export { IframeSandbox } from './sandbox/iframe.js';
 export { InlineSandbox } from './sandbox/inline.js';
 export type { Sandbox } from './sandbox/types.js';
+
+export type {
+  ActionSchema,
+  MountSource,
+  SandboxConfig,
+  ConnectionState,
+  ConnectionStateEvent,
+  NotificationEvent,
+  BridgeMessage,
+} from '@agent-bridge/shared';
+export { toOpenAITool, toAnthropicTool, toGeminiTool } from '@agent-bridge/shared';
+export { BridgeError } from '@agent-bridge/shared';
+export type { BridgeErrorCode } from '@agent-bridge/shared';

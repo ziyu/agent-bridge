@@ -1,7 +1,10 @@
 {
   "name": "@agent-bridge/client",
   "version": "0.1.0",
+  "description": "Client SDK for AgentBridge — lightweight bridge client for guest apps to communicate with host",
   "license": "MIT",
+  "keywords": ["agent", "bridge", "iframe", "sandbox", "ai", "llm", "tool-calling", "postmessage"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,6 +15,9 @@
     }
   },
   "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

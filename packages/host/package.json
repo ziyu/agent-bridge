@@ -1,7 +1,10 @@
 {
   "name": "@agent-bridge/host",
   "version": "0.1.0",
+  "description": "Host SDK for AgentBridge — mount and communicate with AI-generated guest apps via iframe or code injection",
   "license": "MIT",
+  "keywords": ["agent", "bridge", "iframe", "sandbox", "ai", "llm", "tool-calling", "postmessage"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,6 +15,9 @@
     }
   },
   "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
