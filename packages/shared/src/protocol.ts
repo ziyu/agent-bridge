@@ -84,6 +84,54 @@ export type DestroyMessage = MessageBase & {
   type: 'DESTROY';
 };
 
+// Peer Communication
+export type PeerMessage = MessageBase & {
+  type: 'PEER_MESSAGE';
+  id: string;
+  targetConnectionId: string;
+  fromConnectionId?: string;
+  topic: string;
+  payload: Record<string, unknown>;
+};
+
+export type PeerMessageDelivery = MessageBase & {
+  type: 'PEER_MESSAGE_DELIVERY';
+  id: string;
+  fromConnectionId: string;
+  topic: string;
+  payload: Record<string, unknown>;
+};
+
+export type BroadcastMessage = MessageBase & {
+  type: 'BROADCAST';
+  id: string;
+  fromConnectionId?: string;
+  topic: string;
+  payload: Record<string, unknown>;
+};
+
+export type PeerListRequest = MessageBase & {
+  type: 'PEER_LIST_REQUEST';
+  id: string;
+};
+
+export type PeerListResponse = MessageBase & {
+  type: 'PEER_LIST_RESPONSE';
+  id: string;
+  peers: PeerInfo[];
+};
+
+export type PeerChangeNotification = MessageBase & {
+  type: 'PEER_CHANGE';
+  event: 'connected' | 'disconnected';
+  peer: PeerInfo;
+};
+
+export interface PeerInfo {
+  connectionId: string;
+  capabilities: ActionSchema[];
+}
+
 // Union
 export type BridgeMessage =
   | SynMessage
@@ -94,7 +142,13 @@ export type BridgeMessage =
   | NotifyMessage
   | StateSyncMessage
   | CapabilitiesUpdateMessage
-  | DestroyMessage;
+  | DestroyMessage
+  | PeerMessage
+  | PeerMessageDelivery
+  | BroadcastMessage
+  | PeerListRequest
+  | PeerListResponse
+  | PeerChangeNotification;
 
 export type BridgeMessageType = BridgeMessage['type'];
 

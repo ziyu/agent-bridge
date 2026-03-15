@@ -10,6 +10,12 @@ import type {
   StateSyncMessage,
   CapabilitiesUpdateMessage,
   DestroyMessage,
+  PeerMessage,
+  PeerMessageDelivery,
+  BroadcastMessage,
+  PeerListRequest,
+  PeerListResponse,
+  PeerChangeNotification,
 } from './protocol.js';
 
 export function isValidBridgeMessage(data: unknown): data is BridgeMessage {
@@ -57,4 +63,28 @@ export function isCapabilitiesUpdateMessage(msg: BridgeMessage): msg is Capabili
 
 export function isDestroyMessage(msg: BridgeMessage): msg is DestroyMessage {
   return msg.type === 'DESTROY';
+}
+
+export function isPeerMessage(msg: BridgeMessage): msg is PeerMessage {
+  return msg.type === 'PEER_MESSAGE';
+}
+
+export function isPeerMessageDelivery(msg: BridgeMessage): msg is PeerMessageDelivery {
+  return msg.type === 'PEER_MESSAGE_DELIVERY';
+}
+
+export function isBroadcastMessage(msg: BridgeMessage): msg is BroadcastMessage {
+  return msg.type === 'BROADCAST';
+}
+
+export function isPeerListRequest(msg: BridgeMessage): msg is PeerListRequest {
+  return msg.type === 'PEER_LIST_REQUEST';
+}
+
+export function isPeerListResponse(msg: BridgeMessage): msg is PeerListResponse {
+  return msg.type === 'PEER_LIST_RESPONSE';
+}
+
+export function isPeerChangeNotification(msg: BridgeMessage): msg is PeerChangeNotification {
+  return msg.type === 'PEER_CHANGE';
 }

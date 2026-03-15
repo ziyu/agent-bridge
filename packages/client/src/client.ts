@@ -2,6 +2,10 @@ import type {
   ActionSchema,
   BridgeMessage,
   CallMessage,
+  PeerInfo,
+  PeerMessageDelivery,
+  PeerChangeNotification,
+  PeerListResponse,
 } from '@agent_bridge/shared';
 import {
   NAMESPACE,
@@ -12,6 +16,9 @@ import {
   isAck2Message,
   isCallMessage,
   isDestroyMessage,
+  isPeerMessageDelivery,
+  isPeerChangeNotification,
+  isPeerListResponse,
 } from '@agent_bridge/shared';
 import { OfflineQueue } from './queue.js';
 import { ClientTransport } from './transport.js';
@@ -30,6 +37,9 @@ export class BridgeClient {
   private channel: string;
   private participantId = '';
   private remoteParticipantId = '';
+  private peerMessageHandlers = new Set<(msg: { from: string; topic: string; payload: Record<string, unknown> }) => void>();
+  private peerChangeHandlers = new Set<(event: 'connected' | 'disconnected', peer: PeerInfo) => void>();
+  private pendingPeerListRequests = new Map<string, { resolve: (peers: PeerInfo[]) => void }>();
 
   constructor(options?: { channel?: string }) {
     this.channel = options?.channel ?? BridgeClient.detectChannel();
@@ -134,6 +144,71 @@ export class BridgeClient {
     this.sendOrQueue(msg);
   }
 
+  sendToPeer(targetConnectionId: string, topic: string, payload: Record<string, unknown>): void {
+    if (!this.connected) throw new BridgeError('NOT_CONNECTED', 'Must be connected to send peer messages');
+    this.transport!.send({
+      type: 'PEER_MESSAGE',
+      namespace: NAMESPACE,
+      channel: this.channel,
+      id: this.generateId(),
+      targetConnectionId,
+      topic,
+      payload,
+      timestamp: Date.now(),
+    });
+  }
+
+  broadcast(topic: string, payload: Record<string, unknown>): void {
+    if (!this.connected) throw new BridgeError('NOT_CONNECTED', 'Must be connected to broadcast');
+    this.transport!.send({
+      type: 'BROADCAST',
+      namespace: NAMESPACE,
+      channel: this.channel,
+      id: this.generateId(),
+      topic,
+      payload,
+      timestamp: Date.now(),
+    });
+  }
+
+  onPeerMessage(handler: (msg: { from: string; topic: string; payload: Record<string, unknown> }) => void): () => void;
+  onPeerMessage(topic: string, handler: (msg: { from: string; payload: Record<string, unknown> }) => void): () => void;
+  onPeerMessage(
+    topicOrHandler: string | ((msg: { from: string; topic: string; payload: Record<string, unknown> }) => void),
+    maybeHandler?: (msg: { from: string; payload: Record<string, unknown> }) => void,
+  ): () => void {
+    if (typeof topicOrHandler === 'function') {
+      this.peerMessageHandlers.add(topicOrHandler);
+      return () => this.peerMessageHandlers.delete(topicOrHandler);
+    }
+    const topic = topicOrHandler;
+    const wrapped = (msg: { from: string; topic: string; payload: Record<string, unknown> }) => {
+      if (msg.topic === topic) maybeHandler!(msg);
+    };
+    this.peerMessageHandlers.add(wrapped);
+    return () => this.peerMessageHandlers.delete(wrapped);
+  }
+
+  onPeerChange(handler: (event: 'connected' | 'disconnected', peer: PeerInfo) => void): () => void {
+    this.peerChangeHandlers.add(handler);
+    return () => this.peerChangeHandlers.delete(handler);
+  }
+
+  getPeers(): Promise<PeerInfo[]> {
+    if (!this.connected) throw new BridgeError('NOT_CONNECTED', 'Must be connected to get peers');
+    const id = this.generateId();
+    return new Promise((resolve) => {
+      this.pendingPeerListRequests.set(id, { resolve });
+      this.transport!.send({
+        type: 'PEER_LIST_REQUEST',
+        namespace: NAMESPACE,
+        channel: this.channel,
+        id,
+        timestamp: Date.now(),
+      });
+    });
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -151,6 +226,9 @@ export class BridgeClient {
     }
 
     this.actions.clear();
+    this.peerMessageHandlers.clear();
+    this.peerChangeHandlers.clear();
+    this.pendingPeerListRequests.clear();
   }
 
   private onConnected(): void {
@@ -166,6 +244,23 @@ export class BridgeClient {
 
       if (isCallMessage(msg)) {
         void this.handleCall(msg);
+      } else if (isPeerMessageDelivery(msg)) {
+        const delivery = msg as PeerMessageDelivery;
+        this.peerMessageHandlers.forEach((h) => h({
+          from: delivery.fromConnectionId,
+          topic: delivery.topic,
+          payload: delivery.payload,
+        }));
+      } else if (isPeerChangeNotification(msg)) {
+        const notification = msg as PeerChangeNotification;
+        this.peerChangeHandlers.forEach((h) => h(notification.event, notification.peer));
+      } else if (isPeerListResponse(msg)) {
+        const response = msg as PeerListResponse;
+        const pending = this.pendingPeerListRequests.get(response.id);
+        if (pending) {
+          this.pendingPeerListRequests.delete(response.id);
+          pending.resolve(response.peers);
+        }
       } else if (isDestroyMessage(msg)) {
         this.connected = false;
         this.transport?.destroy();

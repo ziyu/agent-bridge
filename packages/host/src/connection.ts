@@ -6,6 +6,13 @@ import type {
   NotificationEvent,
   ReplyMessage,
   Ack2Message,
+  PeerMessage,
+  BroadcastMessage,
+  PeerListRequest,
+  PeerMessageDelivery,
+  PeerChangeNotification,
+  PeerListResponse,
+  PeerInfo,
 } from '@agent_bridge/shared';
 import {
   NAMESPACE,
@@ -21,6 +28,9 @@ import {
   isStateSyncMessage,
   isCapabilitiesUpdateMessage,
   isDestroyMessage,
+  isPeerMessage,
+  isBroadcastMessage,
+  isPeerListRequest,
 } from '@agent_bridge/shared';
 import type { Sandbox } from './sandbox/types.js';
 import { HostTransport } from './transport.js';
@@ -37,6 +47,9 @@ type EventMap = {
   capabilities: ActionSchema[];
   notification: NotificationEvent;
   stateSync: Record<string, unknown>;
+  peerMessage: PeerMessage;
+  broadcast: BroadcastMessage;
+  peerListRequest: PeerListRequest;
 };
 
 type EventHandler<K extends keyof EventMap> = (data: EventMap[K]) => void;
@@ -199,6 +212,12 @@ export class Connection {
         });
       } else if (isStateSyncMessage(msg)) {
         this.emit('stateSync', msg.snapshot);
+      } else if (isPeerMessage(msg)) {
+        this.emit('peerMessage', msg);
+      } else if (isBroadcastMessage(msg)) {
+        this.emit('broadcast', msg);
+      } else if (isPeerListRequest(msg)) {
+        this.emit('peerListRequest', msg);
       } else if (isDestroyMessage(msg)) {
         this.destroy();
       }
@@ -243,6 +262,18 @@ export class Connection {
     this.sandbox.unmount();
     this.setState('disconnected');
     this.listeners.clear();
+  }
+
+  deliverPeerMessage(msg: PeerMessageDelivery): void {
+    this.transport?.send(msg);
+  }
+
+  deliverPeerChange(notification: PeerChangeNotification): void {
+    this.transport?.send(notification);
+  }
+
+  deliverPeerListResponse(response: PeerListResponse): void {
+    this.transport?.send(response);
   }
 
   private setState(next: ConnectionState): void {

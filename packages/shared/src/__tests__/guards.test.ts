@@ -10,6 +10,12 @@ import {
   isStateSyncMessage,
   isCapabilitiesUpdateMessage,
   isDestroyMessage,
+  isPeerMessage,
+  isPeerMessageDelivery,
+  isBroadcastMessage,
+  isPeerListRequest,
+  isPeerListResponse,
+  isPeerChangeNotification,
   NAMESPACE,
 } from '../index.js';
 
@@ -85,5 +91,41 @@ describe('guards', () => {
     expect(isValidBridgeMessage(msg)).toBe(true);
     expect(isCapabilitiesUpdateMessage(msg as any)).toBe(true);
     expect(isDestroyMessage(msg as any)).toBe(false);
+  });
+
+  it('accepts valid PEER_MESSAGE', () => {
+    const msg = { ...base, type: 'PEER_MESSAGE', id: '1', targetConnectionId: 'conn-2', topic: 'sync', payload: {} };
+    expect(isValidBridgeMessage(msg)).toBe(true);
+    expect(isPeerMessage(msg as any)).toBe(true);
+    expect(isBroadcastMessage(msg as any)).toBe(false);
+  });
+
+  it('accepts valid PEER_MESSAGE_DELIVERY', () => {
+    const msg = { ...base, type: 'PEER_MESSAGE_DELIVERY', id: '1', fromConnectionId: 'conn-1', topic: 'sync', payload: {} };
+    expect(isValidBridgeMessage(msg)).toBe(true);
+    expect(isPeerMessageDelivery(msg as any)).toBe(true);
+  });
+
+  it('accepts valid BROADCAST', () => {
+    const msg = { ...base, type: 'BROADCAST', id: '1', topic: 'hello', payload: {} };
+    expect(isValidBridgeMessage(msg)).toBe(true);
+    expect(isBroadcastMessage(msg as any)).toBe(true);
+    expect(isPeerMessage(msg as any)).toBe(false);
+  });
+
+  it('accepts valid PEER_LIST_REQUEST and PEER_LIST_RESPONSE', () => {
+    const req = { ...base, type: 'PEER_LIST_REQUEST', id: '1' };
+    expect(isValidBridgeMessage(req)).toBe(true);
+    expect(isPeerListRequest(req as any)).toBe(true);
+
+    const res = { ...base, type: 'PEER_LIST_RESPONSE', id: '1', peers: [] };
+    expect(isValidBridgeMessage(res)).toBe(true);
+    expect(isPeerListResponse(res as any)).toBe(true);
+  });
+
+  it('accepts valid PEER_CHANGE', () => {
+    const msg = { ...base, type: 'PEER_CHANGE', event: 'connected', peer: { connectionId: 'conn-2', capabilities: [] } };
+    expect(isValidBridgeMessage(msg)).toBe(true);
+    expect(isPeerChangeNotification(msg as any)).toBe(true);
   });
 });

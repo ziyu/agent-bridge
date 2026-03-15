@@ -11,6 +11,13 @@ export type {
   StateSyncMessage,
   CapabilitiesUpdateMessage,
   DestroyMessage,
+  PeerMessage,
+  PeerMessageDelivery,
+  BroadcastMessage,
+  PeerListRequest,
+  PeerListResponse,
+  PeerChangeNotification,
+  PeerInfo,
   BridgeMessage,
   BridgeMessageType,
   ConnectionState,
@@ -31,6 +38,12 @@ export {
   isStateSyncMessage,
   isCapabilitiesUpdateMessage,
   isDestroyMessage,
+  isPeerMessage,
+  isPeerMessageDelivery,
+  isBroadcastMessage,
+  isPeerListRequest,
+  isPeerListResponse,
+  isPeerChangeNotification,
 } from './guards.js';
 export { toOpenAITool, toAnthropicTool, toGeminiTool } from './schema.js';
 export { BridgeError } from './errors.js';

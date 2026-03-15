@@ -13,6 +13,11 @@ export type {
   ConnectionStateEvent,
   NotificationEvent,
   BridgeMessage,
+  PeerInfo,
+  PeerMessage,
+  PeerMessageDelivery,
+  BroadcastMessage,
+  PeerChangeNotification,
 } from '@agent_bridge/shared';
 export { toOpenAITool, toAnthropicTool, toGeminiTool } from '@agent_bridge/shared';
 export { BridgeError } from '@agent_bridge/shared';

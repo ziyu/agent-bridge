@@ -3,8 +3,9 @@ import type {
   MountSource,
   SandboxConfig,
   NotificationEvent,
+  PeerInfo,
 } from '@agent_bridge/shared';
-import { DEFAULT_HANDSHAKE_TIMEOUT } from '@agent_bridge/shared';
+import { DEFAULT_HANDSHAKE_TIMEOUT, NAMESPACE } from '@agent_bridge/shared';
 import { Connection } from './connection.js';
 import { IframeSandbox } from './sandbox/iframe.js';
 import { InlineSandbox } from './sandbox/inline.js';
@@ -43,6 +44,9 @@ export class AgentBridgeHost {
       throw err;
     }
 
+    this.setupPeerRouting(connectionId, connection);
+    this.notifyPeerChange('connected', connectionId);
+
     return connection;
   }
 
@@ -51,6 +55,7 @@ export class AgentBridgeHost {
     if (!conn) return;
     conn.destroy();
     this.connections.delete(connectionId);
+    this.notifyPeerChange('disconnected', connectionId);
   }
 
   async executeAction(
@@ -118,6 +123,82 @@ export class AgentBridgeHost {
       conn.destroy();
     }
     this.connections.clear();
+  }
+
+  getConnectedPeers(excludeConnectionId?: string): PeerInfo[] {
+    const peers: PeerInfo[] = [];
+    for (const [id, conn] of this.connections) {
+      if (id !== excludeConnectionId && conn.getState() === 'connected') {
+        peers.push({ connectionId: id, capabilities: conn.getCapabilities() });
+      }
+    }
+    return peers;
+  }
+
+  private setupPeerRouting(connectionId: string, connection: Connection): void {
+    connection.on('peerMessage', (msg) => {
+      const target = this.connections.get(msg.targetConnectionId);
+      if (!target || target.getState() !== 'connected') return;
+      target.deliverPeerMessage({
+        type: 'PEER_MESSAGE_DELIVERY',
+        namespace: NAMESPACE,
+        channel: msg.targetConnectionId,
+        id: msg.id,
+        fromConnectionId: connectionId,
+        topic: msg.topic,
+        payload: msg.payload,
+        timestamp: Date.now(),
+      });
+    });
+
+    connection.on('broadcast', (msg) => {
+      for (const [id, conn] of this.connections) {
+        if (id !== connectionId && conn.getState() === 'connected') {
+          conn.deliverPeerMessage({
+            type: 'PEER_MESSAGE_DELIVERY',
+            namespace: NAMESPACE,
+            channel: id,
+            id: msg.id,
+            fromConnectionId: connectionId,
+            topic: msg.topic,
+            payload: msg.payload,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    });
+
+    connection.on('peerListRequest', (msg) => {
+      connection.deliverPeerListResponse({
+        type: 'PEER_LIST_RESPONSE',
+        namespace: NAMESPACE,
+        channel: connectionId,
+        id: msg.id,
+        peers: this.getConnectedPeers(connectionId),
+        timestamp: Date.now(),
+      });
+    });
+  }
+
+  private notifyPeerChange(event: 'connected' | 'disconnected', changedConnectionId: string): void {
+    const peer: PeerInfo = {
+      connectionId: changedConnectionId,
+      capabilities: event === 'connected'
+        ? (this.connections.get(changedConnectionId)?.getCapabilities() ?? [])
+        : [],
+    };
+    for (const [id, conn] of this.connections) {
+      if (id !== changedConnectionId && conn.getState() === 'connected') {
+        conn.deliverPeerChange({
+          type: 'PEER_CHANGE',
+          namespace: NAMESPACE,
+          channel: id,
+          event,
+          peer,
+          timestamp: Date.now(),
+        });
+      }
+    }
   }
 
   private generateId(): string {
