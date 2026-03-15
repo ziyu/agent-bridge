@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { OfflineQueue } from '../queue.js';
-import { NAMESPACE } from '@agent-bridge/shared';
-import type { BridgeMessage } from '@agent-bridge/shared';
+import { NAMESPACE } from '@agent_bridge/shared';
+import type { BridgeMessage } from '@agent_bridge/shared';
 
 const makeMsg = (type: string): BridgeMessage =>
   ({ namespace: NAMESPACE, channel: 'test', timestamp: Date.now(), type } as any);

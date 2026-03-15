@@ -6,7 +6,7 @@ import type {
   NotificationEvent,
   ReplyMessage,
   Ack2Message,
-} from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
 import {
   NAMESPACE,
   PROTOCOL_VERSION,
@@ -21,7 +21,7 @@ import {
   isStateSyncMessage,
   isCapabilitiesUpdateMessage,
   isDestroyMessage,
-} from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
 import type { Sandbox } from './sandbox/types.js';
 import { HostTransport } from './transport.js';
 

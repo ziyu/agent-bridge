@@ -3,8 +3,8 @@ import type {
   MountSource,
   SandboxConfig,
   NotificationEvent,
-} from '@agent-bridge/shared';
-import { DEFAULT_HANDSHAKE_TIMEOUT } from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
+import { DEFAULT_HANDSHAKE_TIMEOUT } from '@agent_bridge/shared';
 import { Connection } from './connection.js';
 import { IframeSandbox } from './sandbox/iframe.js';
 import { InlineSandbox } from './sandbox/inline.js';

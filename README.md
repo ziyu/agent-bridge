@@ -2,17 +2,17 @@
 
 轻量级 TypeScript SDK，让宿主应用挂载 AI 生成的子应用，并通过 `postMessage` 建立双向通信。
 
-- `@agent-bridge/host` — 宿主端 SDK，负责挂载、通信、执行 action
-- `@agent-bridge/client` — 子应用端 SDK，零依赖，~1.7KB gzip
+- `@agent_bridge/host` — 宿主端 SDK，负责挂载、通信、执行 action
+- `@agent_bridge/client` — 子应用端 SDK，零依赖，~1.7KB gzip
 
 ## 安装
 
 ```bash
 # 宿主应用
-npm install @agent-bridge/host
+npm install @agent_bridge/host
 
 # 子应用（iframe 模式需要独立安装）
-npm install @agent-bridge/client
+npm install @agent_bridge/client
 ```
 
 ## 快速开始
@@ -20,7 +20,7 @@ npm install @agent-bridge/client
 ### 宿主端（Host）
 
 ```typescript
-import { AgentBridgeHost, toOpenAITool } from '@agent-bridge/host';
+import { AgentBridgeHost, toOpenAITool } from '@agent_bridge/host';
 
 const host = new AgentBridgeHost();
 
@@ -54,7 +54,7 @@ conn.on('stateSync', (snapshot) => console.log(snapshot));
 ### 子应用端（Client）
 
 ```typescript
-import { BridgeClient } from '@agent-bridge/client';
+import { BridgeClient } from '@agent_bridge/client';
 
 const client = new BridgeClient();
 
@@ -80,11 +80,11 @@ client.notifyHost('ready', { timestamp: Date.now() });
 client.syncState({ status: 'running' });
 ```
 
-> Inline 模式下，Client SDK 由宿主自动注入（IIFE: `@agent-bridge/client/dist/index.global.js`），子应用代码直接使用 `new AgentBridgeClient.BridgeClient()` 即可。
+> Inline 模式下，Client SDK 由宿主自动注入（IIFE: `@agent_bridge/client/dist/index.global.js`），子应用代码直接使用 `new AgentBridgeClient.BridgeClient()` 即可。
 
 ## API 概览
 
-### @agent-bridge/host
+### @agent_bridge/host
 
 | API | 说明 |
 |-----|------|
@@ -99,7 +99,7 @@ client.syncState({ status: 'running' });
 | `toAnthropicTool(schema)` | ActionSchema → Anthropic tool 格式 |
 | `toGeminiTool(schema)` | ActionSchema → Gemini tool 格式 |
 
-### @agent-bridge/client
+### @agent_bridge/client
 
 | API | 说明 |
 |-----|------|

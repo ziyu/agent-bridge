@@ -2,7 +2,7 @@ import type {
   ActionSchema,
   BridgeMessage,
   CallMessage,
-} from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
 import {
   NAMESPACE,
   PROTOCOL_VERSION,
@@ -12,7 +12,7 @@ import {
   isAck2Message,
   isCallMessage,
   isDestroyMessage,
-} from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
 import { OfflineQueue } from './queue.js';
 import { ClientTransport } from './transport.js';
 

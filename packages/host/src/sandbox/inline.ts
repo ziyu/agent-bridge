@@ -1,4 +1,4 @@
-import type { MountSource, SandboxConfig } from '@agent-bridge/shared';
+import type { MountSource, SandboxConfig } from '@agent_bridge/shared';
 import type { Sandbox } from './types.js';
 
 declare const __CLIENT_BUNDLE__: string;

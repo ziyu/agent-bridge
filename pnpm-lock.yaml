@@ -26,13 +26,13 @@ importers:
 
   packages/client:
     devDependencies:
-      '@agent-bridge/shared':
+      '@agent_bridge/shared':
         specifier: workspace:*
         version: link:../shared
 
   packages/host:
     dependencies:
-      '@agent-bridge/shared':
+      '@agent_bridge/shared':
         specifier: workspace:*
         version: link:../shared
 

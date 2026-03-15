@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BridgeClient } from '../client.js';
-import { NAMESPACE } from '@agent-bridge/shared';
+import { NAMESPACE } from '@agent_bridge/shared';
 
 describe('BridgeClient', () => {
   beforeEach(() => {

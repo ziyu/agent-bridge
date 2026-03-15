@@ -1,5 +1,5 @@
 {
-  "name": "@agent-bridge/client",
+  "name": "@agent_bridge/client",
   "version": "0.1.0",
   "description": "Client SDK for AgentBridge — lightweight bridge client for guest apps to communicate with host",
   "license": "MIT",
@@ -25,6 +25,6 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@agent-bridge/shared": "workspace:*"
+    "@agent_bridge/shared": "workspace:*"
   }
 }

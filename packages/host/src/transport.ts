@@ -1,5 +1,5 @@
-import type { BridgeMessage } from '@agent-bridge/shared';
-import { isValidBridgeMessage } from '@agent-bridge/shared';
+import type { BridgeMessage } from '@agent_bridge/shared';
+import { isValidBridgeMessage } from '@agent_bridge/shared';
 
 export class HostTransport {
   private port: MessagePort | null = null;

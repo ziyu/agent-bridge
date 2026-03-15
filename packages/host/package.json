@@ -1,5 +1,5 @@
 {
-  "name": "@agent-bridge/host",
+  "name": "@agent_bridge/host",
   "version": "0.1.0",
   "description": "Host SDK for AgentBridge — mount and communicate with AI-generated guest apps via iframe or code injection",
   "license": "MIT",
@@ -24,6 +24,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agent-bridge/shared": "workspace:*"
+    "@agent_bridge/shared": "workspace:*"
   }
 }

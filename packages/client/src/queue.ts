@@ -1,4 +1,4 @@
-import type { BridgeMessage } from '@agent-bridge/shared';
+import type { BridgeMessage } from '@agent_bridge/shared';
 
 export class OfflineQueue {
   private buffer: BridgeMessage[] = [];

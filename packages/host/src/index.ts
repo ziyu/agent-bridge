@@ -13,7 +13,7 @@ export type {
   ConnectionStateEvent,
   NotificationEvent,
   BridgeMessage,
-} from '@agent-bridge/shared';
-export { toOpenAITool, toAnthropicTool, toGeminiTool } from '@agent-bridge/shared';
-export { BridgeError } from '@agent-bridge/shared';
-export type { BridgeErrorCode } from '@agent-bridge/shared';
+} from '@agent_bridge/shared';
+export { toOpenAITool, toAnthropicTool, toGeminiTool } from '@agent_bridge/shared';
+export { BridgeError } from '@agent_bridge/shared';
+export type { BridgeErrorCode } from '@agent_bridge/shared';

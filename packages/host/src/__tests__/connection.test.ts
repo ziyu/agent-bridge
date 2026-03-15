@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Connection } from '../connection.js';
 import type { Sandbox } from '../sandbox/types.js';
-import { NAMESPACE } from '@agent-bridge/shared';
-import type { BridgeMessage } from '@agent-bridge/shared';
+import { NAMESPACE } from '@agent_bridge/shared';
+import type { BridgeMessage } from '@agent_bridge/shared';
 
 function createMockSandbox(): Sandbox {
   return {
