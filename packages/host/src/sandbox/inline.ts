@@ -14,12 +14,12 @@ export class InlineSandbox implements Sandbox {
   private iframe: HTMLIFrameElement | null = null;
   private crashHandlers = new Set<(error: Error) => void>();
 
-  mount(source: MountSource & { type: 'raw' }, config: SandboxConfig): HTMLIFrameElement {
+  mount(source: MountSource & { type: 'raw' }, config: SandboxConfig, connectionId: string): HTMLIFrameElement {
     this.iframe = document.createElement('iframe');
     this.iframe.setAttribute('sandbox', 'allow-scripts');
     this.iframe.style.cssText = 'border:none;width:100%;height:100%';
 
-    const html = this.wrapWithClientSDK(source.code, source.codeType ?? 'html');
+    const html = this.wrapWithClientSDK(source.code, source.codeType ?? 'html', connectionId);
     this.iframe.srcdoc = html;
 
     this.iframe.addEventListener('error', () => {
@@ -31,9 +31,10 @@ export class InlineSandbox implements Sandbox {
     return this.iframe;
   }
 
-  private wrapWithClientSDK(code: string, codeType: 'html' | 'js'): string {
+  private wrapWithClientSDK(code: string, codeType: 'html' | 'js', connectionId: string): string {
     const clientBundle = getInlinedClientBundle();
-    const sdkScript = clientBundle ? `<script>${clientBundle}</script>` : '';
+    const channelScript = `<script>window.__AGENT_BRIDGE_CHANNEL__="${connectionId}";</script>`;
+    const sdkScript = clientBundle ? `${channelScript}<script>${clientBundle}</script>` : channelScript;
 
     if (codeType === 'html') {
       if (code.includes('</head>')) {

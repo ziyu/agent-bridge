@@ -7,10 +7,7 @@
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist",
     "pretest": "pnpm -r build",
-    "examples": "pnpm run build && npx serve . -l 3000 --no-clipboard",
-    "example:01": "pnpm run build && npx serve . -l 3000 --no-clipboard -o /examples/01-basic-inline/index.html",
-    "example:02": "pnpm run build && npx serve . -l 3000 --no-clipboard -o /examples/02-iframe-mode/host.html",
-    "example:03": "pnpm run build && npx serve . -l 3000 --no-clipboard -o /examples/03-llm-tool-calling/index.html"
+    "examples": "pnpm run build && npx serve . -l 3000 --no-clipboard"
   },
   "engines": {
     "node": ">=18"

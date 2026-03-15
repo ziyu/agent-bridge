@@ -9,6 +9,9 @@ export class ClientTransport {
   constructor() {
     this.windowHandler = (e: MessageEvent) => {
       if (!isValidBridgeMessage(e.data)) return;
+      if (e.ports?.length > 0 && !this.port) {
+        this.upgradeToPort(e.ports[0]);
+      }
       this.handlers.forEach((h) => h(e.data as BridgeMessage));
     };
     window.addEventListener('message', this.windowHandler);

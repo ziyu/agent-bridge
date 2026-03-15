@@ -3,6 +3,7 @@ import { isValidBridgeMessage } from '@agent-bridge/shared';
 
 export class HostTransport {
   private port: MessagePort | null = null;
+  private pendingPort: MessagePort | null = null;
   private handlers = new Set<(msg: BridgeMessage) => void>();
   private windowHandler: ((e: MessageEvent) => void) | null = null;
   private targetWindow: Window;
@@ -18,7 +19,7 @@ export class HostTransport {
       if (!isValidBridgeMessage(e.data)) return;
 
       if ((e.data as BridgeMessage).type === 'SYN' && !this.concreteOrigin) {
-        this.concreteOrigin = e.origin;
+        this.concreteOrigin = e.origin === 'null' ? '*' : e.origin;
       }
 
       this.handlers.forEach((h) => h(e.data as BridgeMessage));
@@ -26,21 +27,34 @@ export class HostTransport {
     window.addEventListener('message', this.windowHandler);
   }
 
-  upgradeToMessageChannel(): MessagePort {
+  createMessageChannel(): MessagePort {
     const { port1, port2 } = new MessageChannel();
-    this.port = port1;
-    port1.addEventListener('message', (e: MessageEvent) => {
+    this.pendingPort = port1;
+    return port2;
+  }
+
+  activateMessageChannel(): void {
+    if (!this.pendingPort) return;
+    this.port = this.pendingPort;
+    this.pendingPort = null;
+    this.port.addEventListener('message', (e: MessageEvent) => {
       if (!isValidBridgeMessage(e.data)) return;
       this.handlers.forEach((h) => h(e.data as BridgeMessage));
     });
-    port1.start();
+    this.port.start();
 
     if (this.windowHandler) {
       window.removeEventListener('message', this.windowHandler);
       this.windowHandler = null;
     }
+  }
 
-    return port2;
+  getTargetOrigin(): string {
+    return this.concreteOrigin ?? '*';
+  }
+
+  sendViaWindow(message: BridgeMessage, origin: string, transferables?: Transferable[]): void {
+    this.targetWindow.postMessage(message, origin, transferables ?? []);
   }
 
   send(message: BridgeMessage, transferables?: Transferable[]): void {

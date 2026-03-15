@@ -89,6 +89,7 @@ export class Connection {
 
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
+        clearInterval(synInterval);
         this.setState('error');
         reject(new BridgeError('HANDSHAKE_TIMEOUT', `Handshake timed out after ${timeout}ms`));
       }, timeout);
@@ -105,9 +106,11 @@ export class Connection {
             this.sendAck1();
           }
         } else if (isAck1Message(msg)) {
+          clearInterval(synInterval);
           this.sendAck2WithPort();
           this.finishHandshake(timer, cleanup, resolve);
         } else if (isAck2Message(msg)) {
+          clearInterval(synInterval);
           this.capabilities = (msg as Ack2Message).capabilities;
           this.emit('capabilities', this.capabilities);
           this.finishHandshake(timer, cleanup, resolve);
@@ -115,6 +118,7 @@ export class Connection {
       });
 
       this.sendSyn();
+      const synInterval = setInterval(() => this.sendSyn(), 100);
     });
   }
 
@@ -131,8 +135,9 @@ export class Connection {
   }
 
   private sendAck2WithPort(): void {
-    const port2 = this.transport!.upgradeToMessageChannel();
-    this.transport!.send(
+    const port2 = this.transport!.createMessageChannel();
+    const origin = this.transport!.getTargetOrigin();
+    this.transport!.sendViaWindow(
       {
         type: 'ACK2',
         namespace: NAMESPACE,
@@ -140,8 +145,10 @@ export class Connection {
         timestamp: Date.now(),
         capabilities: [],
       },
+      origin,
       [port2],
     );
+    this.transport!.activateMessageChannel();
   }
 
   async executeAction(

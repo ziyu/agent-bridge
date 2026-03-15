@@ -17,7 +17,7 @@ export class AgentBridgeHost {
     const connectionId = this.generateId();
     const connection = new Connection(connectionId, sandbox);
 
-    sandbox.mount(source as any, config);
+    sandbox.mount(source as any, config, connectionId);
 
     const targetWindow = sandbox.getContentWindow();
     if (!targetWindow) {

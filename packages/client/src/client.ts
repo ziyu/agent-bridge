@@ -32,7 +32,25 @@ export class BridgeClient {
   private remoteParticipantId = '';
 
   constructor(options?: { channel?: string }) {
-    this.channel = options?.channel ?? 'default';
+    this.channel = options?.channel ?? BridgeClient.detectChannel();
+  }
+
+  private static detectChannel(): string {
+    // 1. Injected global by InlineSandbox
+    if (typeof (globalThis as any).__AGENT_BRIDGE_CHANNEL__ === 'string') {
+      return (globalThis as any).__AGENT_BRIDGE_CHANNEL__;
+    }
+    // 2. URL query param by IframeSandbox
+    if (typeof location !== 'undefined') {
+      try {
+        const params = new URLSearchParams(location.search);
+        const ch = params.get('__bridge_channel__');
+        if (ch) return ch;
+      } catch {
+        // ignore
+      }
+    }
+    return 'default';
   }
 
   async initialize(): Promise<void> {
@@ -55,11 +73,13 @@ export class BridgeClient {
             this.sendAck1();
           }
         } else if (isAck1Message(msg)) {
+          clearInterval(synInterval);
           this.sendAck2();
           this.onConnected();
           cleanup();
           resolve();
         } else if (isAck2Message(msg)) {
+          clearInterval(synInterval);
           this.onConnected();
           cleanup();
           resolve();
@@ -67,6 +87,7 @@ export class BridgeClient {
       });
 
       this.sendSyn();
+      const synInterval = setInterval(() => this.sendSyn(), 100);
     });
   }
 
