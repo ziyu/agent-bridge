@@ -137,6 +137,20 @@
       document.getElementById('msgs').prepend(el);
     });
 
+    window.addEventListener('message', (e) => {
+      if (!e.data || e.data.namespace !== '__demo_cmd__') return;
+      const cmd = e.data;
+      if (cmd.action === 'sendToPeer') {
+        client.sendToPeer(cmd.target, cmd.topic, cmd.payload);
+      } else if (cmd.action === 'broadcast') {
+        client.broadcast(cmd.topic, cmd.payload);
+      } else if (cmd.action === 'getPeers') {
+        client.getPeers().then(peers => {
+          window.parent.postMessage({ namespace: '__demo_resp__', action: 'peers', peers }, '*');
+        });
+      }
+    });
+
     client.initialize().then(() => {
       document.getElementById('status').textContent = 'Connected';
       client.notifyHost('ready', { name: '${name}' });
@@ -147,9 +161,7 @@
         document.getElementById('msgs').prepend(el);
       });
     });
-
-    window.__bridgeClient = client;
-  <\\/script>
+  ${'<'}/script>
 </body></html>`;
     }
 
@@ -228,6 +240,11 @@
       addLog('All 3 clients mounted. Try sending peer messages!', 'log-system');
     }
 
+    function sendCmd(clientEntry, cmd) {
+      const frame = document.getElementById(`sandbox-${clientEntry.index}`).querySelector('iframe');
+      frame?.contentWindow?.postMessage(cmd, '*');
+    }
+
     btnSend.addEventListener('click', () => {
       const fromId = msgFrom.value;
       const toId = msgTo.value;
@@ -241,11 +258,8 @@
         return;
       }
 
-      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
-      if (frame?.contentWindow?.__bridgeClient) {
-        frame.contentWindow.__bridgeClient.sendToPeer(toId, topic, { text });
-        addLog(`${from.name} → ${to.name} [${topic}]: ${text}`, 'log-peer');
-      }
+      sendCmd(from, { namespace: '__demo_cmd__', action: 'sendToPeer', target: toId, topic, payload: { text } });
+      addLog(`${from.name} → ${to.name} [${topic}]: ${text}`, 'log-peer');
     });
 
     btnBroadcast.addEventListener('click', () => {
@@ -255,11 +269,8 @@
       const from = clients.find(c => c.connectionId === fromId);
       if (!from) return;
 
-      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
-      if (frame?.contentWindow?.__bridgeClient) {
-        frame.contentWindow.__bridgeClient.broadcast(topic, { text });
-        addLog(`${from.name} 📢 broadcast [${topic}]: ${text}`, 'log-broadcast');
-      }
+      sendCmd(from, { namespace: '__demo_cmd__', action: 'broadcast', topic, payload: { text } });
+      addLog(`${from.name} 📢 broadcast [${topic}]: ${text}`, 'log-broadcast');
     });
 
     btnGetPeers.addEventListener('click', async () => {
@@ -267,18 +278,28 @@
       const from = clients.find(c => c.connectionId === fromId);
       if (!from) return;
 
-      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
-      if (frame?.contentWindow?.__bridgeClient) {
-        try {
-          const peers = await frame.contentWindow.__bridgeClient.getPeers();
-          addLog(`${from.name} queried peers: ${peers.map(p => p.connectionId.slice(0,8)).join(', ')} (${peers.length} total)`, 'log-route');
-          document.getElementById(`peers-${from.index}`).textContent = `Peers: ${peers.map(p => {
-            const match = clients.find(c => c.connectionId === p.connectionId);
-            return match ? match.name : p.connectionId.slice(0,8);
-          }).join(', ')}`;
-        } catch (err) {
-          addLog(`getPeers failed: ${err.message}`, 'log-error');
-        }
+      const peersPromise = new Promise(resolve => {
+        const handler = (e) => {
+          if (e.data?.namespace === '__demo_resp__' && e.data.action === 'peers') {
+            window.removeEventListener('message', handler);
+            resolve(e.data.peers);
+          }
+        };
+        window.addEventListener('message', handler);
+        setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 3000);
+      });
+
+      sendCmd(from, { namespace: '__demo_cmd__', action: 'getPeers' });
+
+      const peers = await peersPromise;
+      if (peers) {
+        addLog(`${from.name} queried peers: ${peers.map(p => p.connectionId.slice(0,8)).join(', ')} (${peers.length} total)`, 'log-route');
+        document.getElementById(`peers-${from.index}`).textContent = `Peers: ${peers.map(p => {
+          const match = clients.find(c => c.connectionId === p.connectionId);
+          return match ? match.name : p.connectionId.slice(0,8);
+        }).join(', ')}`;
+      } else {
+        addLog(`getPeers timed out`, 'log-error');
       }
     });
 
