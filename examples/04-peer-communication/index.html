@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge - Multi-Client Peer Communication</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; }
+    h1 { margin-bottom: 8px; }
+    p.desc { color: #666; margin-bottom: 24px; }
+    .panel { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .panel h2 { font-size: 14px; color: #999; text-transform: uppercase; margin-bottom: 12px; }
+    .clients-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .client-card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .client-card h3 { font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .client-card .dot { width: 10px; height: 10px; border-radius: 50%; background: #999; display: inline-block; }
+    .client-card .dot.connected { background: #16a34a; }
+    .sandbox-frame { width: 100%; height: 120px; border: 2px dashed #ddd; border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+    .sandbox-frame iframe { border: none; }
+    .client-id { font-family: monospace; font-size: 11px; color: #999; word-break: break-all; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-size: 13px; }
+    button:hover { background: #f0f0f0; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.primary:hover { background: #1d4ed8; }
+    button.broadcast { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+    button.broadcast:hover { background: #6d28d9; }
+    select, input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+    #log { font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+    #log div { padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+    .log-route { color: #7c3aed; }
+    .log-peer { color: #2563eb; }
+    .log-broadcast { color: #ea580c; }
+    .log-system { color: #16a34a; }
+    .log-error { color: #dc2626; }
+    .peer-list { font-size: 12px; color: #666; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>04 - Multi-Client Peer Communication</h1>
+  <p class="desc">Host mounts 3 guest apps. Guests discover each other, send direct messages, and broadcast to all peers via Host routing.</p>
+
+  <div class="clients-grid" id="clients-grid"></div>
+
+  <div class="panel">
+    <h2>Peer Messaging</h2>
+    <div class="controls">
+      <label>From:
+        <select id="msg-from"></select>
+      </label>
+      <label>To:
+        <select id="msg-to">
+          <option value="__broadcast__">📢 Broadcast All</option>
+        </select>
+      </label>
+      <label>Topic:
+        <input type="text" id="msg-topic" value="chat" style="width: 100px;" />
+      </label>
+      <label>Message:
+        <input type="text" id="msg-text" value="Hello!" style="width: 160px;" />
+      </label>
+      <button id="btn-send" class="primary" disabled>Send</button>
+      <button id="btn-broadcast" class="broadcast" disabled>Broadcast</button>
+    </div>
+    <div class="controls">
+      <button id="btn-get-peers" disabled>Query Peers (from selected sender)</button>
+      <button id="btn-mount-extra" disabled>Mount 4th Client</button>
+      <button id="btn-unmount-last" disabled>Unmount Last Client</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import { AgentBridgeHost } from '../../packages/host/dist/index.mjs';
+
+    const log = document.getElementById('log');
+    const grid = document.getElementById('clients-grid');
+    const msgFrom = document.getElementById('msg-from');
+    const msgTo = document.getElementById('msg-to');
+    const msgTopic = document.getElementById('msg-topic');
+    const msgText = document.getElementById('msg-text');
+    const btnSend = document.getElementById('btn-send');
+    const btnBroadcast = document.getElementById('btn-broadcast');
+    const btnGetPeers = document.getElementById('btn-get-peers');
+    const btnMountExtra = document.getElementById('btn-mount-extra');
+    const btnUnmountLast = document.getElementById('btn-unmount-last');
+
+    const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#7c3aed', '#dc2626'];
+    const NAMES = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+
+    function addLog(msg, cls = 'log-system') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(d);
+    }
+
+    const host = new AgentBridgeHost();
+    const clients = [];
+
+    function makeGuestCode(name, color) {
+      return `<!DOCTYPE html>
+<html><head><style>
+  body { font-family: system-ui, sans-serif; padding: 12px; background: ${color}11; }
+  h3 { color: ${color}; font-size: 14px; margin-bottom: 4px; }
+  #status { font-size: 12px; color: #666; }
+  #msgs { font-size: 11px; font-family: monospace; margin-top: 6px; max-height: 60px; overflow-y: auto; }
+  #msgs div { padding: 2px 0; }
+</style></head><body>
+  <h3>${name}</h3>
+  <div id="status">Connecting...</div>
+  <div id="msgs"></div>
+  <script>
+    const client = new AgentBridgeClient.BridgeClient();
+
+    client.registerAction('echo', 'Echo a message back', {
+      type: 'object',
+      properties: { text: { type: 'string', description: 'Text to echo' } },
+      required: ['text'],
+    }, (params) => ({ echo: '${name}: ' + params.text }));
+
+    client.onPeerMessage((msg) => {
+      const el = document.createElement('div');
+      el.textContent = '[' + msg.topic + '] from ' + msg.from.slice(0,8) + ': ' + JSON.stringify(msg.payload);
+      document.getElementById('msgs').prepend(el);
+    });
+
+    client.onPeerChange((event, peer) => {
+      const el = document.createElement('div');
+      el.style.color = event === 'connected' ? '#16a34a' : '#dc2626';
+      el.textContent = 'Peer ' + event + ': ' + peer.connectionId.slice(0,8);
+      document.getElementById('msgs').prepend(el);
+    });
+
+    client.initialize().then(() => {
+      document.getElementById('status').textContent = 'Connected';
+      client.notifyHost('ready', { name: '${name}' });
+      client.getPeers().then(peers => {
+        const el = document.createElement('div');
+        el.style.color = '#7c3aed';
+        el.textContent = 'Peers online: ' + peers.length;
+        document.getElementById('msgs').prepend(el);
+      });
+    });
+
+    window.__bridgeClient = client;
+  <\\/script>
+</body></html>`;
+    }
+
+    function createClientCard(index) {
+      const card = document.createElement('div');
+      card.className = 'client-card';
+      card.id = `client-card-${index}`;
+      card.innerHTML = `
+        <h3><span class="dot" id="dot-${index}"></span> ${NAMES[index]}</h3>
+        <div class="sandbox-frame" id="sandbox-${index}"></div>
+        <div class="client-id" id="cid-${index}">—</div>
+        <div class="peer-list" id="peers-${index}"></div>
+      `;
+      grid.appendChild(card);
+      return card;
+    }
+
+    async function mountClient(index) {
+      const name = NAMES[index];
+      const color = COLORS[index];
+      createClientCard(index);
+
+      try {
+        const conn = await host.mount(
+          { type: 'raw', code: makeGuestCode(name, color), codeType: 'html' },
+          { container: document.getElementById(`sandbox-${index}`) }
+        );
+
+        const entry = { index, name, connectionId: conn.id, conn };
+        clients.push(entry);
+
+        document.getElementById(`dot-${index}`).classList.add('connected');
+        document.getElementById(`cid-${index}`).textContent = conn.id.slice(0, 12) + '...';
+
+        conn.on('notification', (evt) => {
+          addLog(`${name} notified: ${evt.eventName} ${JSON.stringify(evt.eventData)}`, 'log-system');
+        });
+
+        updateSelectors();
+        addLog(`${name} mounted (${conn.id.slice(0,8)})`, 'log-system');
+      } catch (err) {
+        addLog(`Failed to mount ${name}: ${err.message}`, 'log-error');
+      }
+    }
+
+    function updateSelectors() {
+      msgFrom.innerHTML = '';
+      const broadcastOpt = msgTo.querySelector('option[value="__broadcast__"]');
+      msgTo.innerHTML = '';
+      msgTo.appendChild(broadcastOpt || Object.assign(document.createElement('option'), { value: '__broadcast__', textContent: '📢 Broadcast All' }));
+
+      clients.forEach((c) => {
+        const optFrom = document.createElement('option');
+        optFrom.value = c.connectionId;
+        optFrom.textContent = c.name;
+        msgFrom.appendChild(optFrom);
+
+        const optTo = document.createElement('option');
+        optTo.value = c.connectionId;
+        optTo.textContent = c.name;
+        msgTo.appendChild(optTo);
+      });
+
+      const hasClients = clients.length >= 2;
+      btnSend.disabled = !hasClients;
+      btnBroadcast.disabled = !hasClients;
+      btnGetPeers.disabled = clients.length === 0;
+      btnUnmountLast.disabled = clients.length === 0;
+    }
+
+    async function init() {
+      for (let i = 0; i < 3; i++) {
+        await mountClient(i);
+      }
+      btnMountExtra.disabled = false;
+      addLog('All 3 clients mounted. Try sending peer messages!', 'log-system');
+    }
+
+    btnSend.addEventListener('click', () => {
+      const fromId = msgFrom.value;
+      const toId = msgTo.value;
+      if (toId === '__broadcast__') return;
+      const topic = msgTopic.value || 'chat';
+      const text = msgText.value || 'Hello!';
+      const from = clients.find(c => c.connectionId === fromId);
+      const to = clients.find(c => c.connectionId === toId);
+      if (!from || !to || fromId === toId) {
+        addLog('Cannot send to self or invalid selection', 'log-error');
+        return;
+      }
+
+      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
+      if (frame?.contentWindow?.__bridgeClient) {
+        frame.contentWindow.__bridgeClient.sendToPeer(toId, topic, { text });
+        addLog(`${from.name} → ${to.name} [${topic}]: ${text}`, 'log-peer');
+      }
+    });
+
+    btnBroadcast.addEventListener('click', () => {
+      const fromId = msgFrom.value;
+      const topic = msgTopic.value || 'chat';
+      const text = msgText.value || 'Hello everyone!';
+      const from = clients.find(c => c.connectionId === fromId);
+      if (!from) return;
+
+      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
+      if (frame?.contentWindow?.__bridgeClient) {
+        frame.contentWindow.__bridgeClient.broadcast(topic, { text });
+        addLog(`${from.name} 📢 broadcast [${topic}]: ${text}`, 'log-broadcast');
+      }
+    });
+
+    btnGetPeers.addEventListener('click', async () => {
+      const fromId = msgFrom.value;
+      const from = clients.find(c => c.connectionId === fromId);
+      if (!from) return;
+
+      const frame = document.getElementById(`sandbox-${from.index}`).querySelector('iframe');
+      if (frame?.contentWindow?.__bridgeClient) {
+        try {
+          const peers = await frame.contentWindow.__bridgeClient.getPeers();
+          addLog(`${from.name} queried peers: ${peers.map(p => p.connectionId.slice(0,8)).join(', ')} (${peers.length} total)`, 'log-route');
+          document.getElementById(`peers-${from.index}`).textContent = `Peers: ${peers.map(p => {
+            const match = clients.find(c => c.connectionId === p.connectionId);
+            return match ? match.name : p.connectionId.slice(0,8);
+          }).join(', ')}`;
+        } catch (err) {
+          addLog(`getPeers failed: ${err.message}`, 'log-error');
+        }
+      }
+    });
+
+    btnMountExtra.addEventListener('click', async () => {
+      const idx = clients.length;
+      if (idx >= NAMES.length) {
+        addLog('Max 5 clients reached', 'log-error');
+        return;
+      }
+      await mountClient(idx);
+    });
+
+    btnUnmountLast.addEventListener('click', () => {
+      const last = clients.pop();
+      if (!last) return;
+      host.unmount(last.connectionId);
+      document.getElementById(`client-card-${last.index}`).remove();
+      updateSelectors();
+      addLog(`${last.name} unmounted`, 'log-system');
+    });
+
+    init();
+  </script>
+</body>
+</html>
