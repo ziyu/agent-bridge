@@ -40,12 +40,13 @@ export class BridgeClient {
     if (typeof (globalThis as any).__AGENT_BRIDGE_CHANNEL__ === 'string') {
       return (globalThis as any).__AGENT_BRIDGE_CHANNEL__;
     }
-    // 2. URL query param by IframeSandbox
+    // 2. URL hash by IframeSandbox (survives redirects unlike query params)
     if (typeof location !== 'undefined') {
       try {
-        const params = new URLSearchParams(location.search);
-        const ch = params.get('__bridge_channel__');
-        if (ch) return ch;
+        const hash = location.hash?.slice(1);
+        if (hash?.startsWith('__bridge_channel__=')) {
+          return hash.split('=')[1];
+        }
       } catch {
         // ignore
       }

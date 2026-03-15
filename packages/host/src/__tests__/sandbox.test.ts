@@ -11,7 +11,7 @@ describe('IframeSandbox', () => {
     document.body.appendChild(container);
   });
 
-  it('creates iframe with correct src and sandbox attribute', () => {
+  it('creates iframe with correct src and no sandbox by default', () => {
     const sandbox = new IframeSandbox();
     const connId = 'test-conn-123';
     const iframe = sandbox.mount(
@@ -21,8 +21,8 @@ describe('IframeSandbox', () => {
     );
 
     expect(iframe.tagName).toBe('IFRAME');
-    expect(iframe.src).toBe('https://example.com/app?__bridge_channel__=test-conn-123');
-    expect(iframe.getAttribute('sandbox')).toBe('allow-scripts allow-forms');
+    expect(iframe.src).toBe('https://example.com/app#__bridge_channel__=test-conn-123');
+    expect(iframe.getAttribute('sandbox')).toBeNull();
     expect(container.contains(iframe)).toBe(true);
   });
 

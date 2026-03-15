@@ -8,9 +8,11 @@ export class IframeSandbox implements Sandbox {
   mount(source: MountSource & { type: 'uri' }, config: SandboxConfig, connectionId: string): HTMLIFrameElement {
     this.iframe = document.createElement('iframe');
     const url = new URL(source.url, window.location.href);
-    url.searchParams.set('__bridge_channel__', connectionId);
+    url.hash = `__bridge_channel__=${connectionId}`;
     this.iframe.src = url.toString();
-    this.iframe.setAttribute('sandbox', config.sandbox ?? 'allow-scripts allow-forms');
+    if (config.sandbox) {
+      this.iframe.setAttribute('sandbox', config.sandbox);
+    }
     if (config.permissions?.length) {
       this.iframe.allow = config.permissions.join('; ');
     }
