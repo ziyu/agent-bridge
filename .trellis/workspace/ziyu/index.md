@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 1
+- **Total Sessions**: 4
 - **Last Active**: 2026-03-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~57 | Active |
+| `journal-1.md` | ~170 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,7 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits |
 |---|------|-------|---------|
-| 1 | 2026-03-15 | Verify and fix Example 04 peer communication demo | `24336f6` |
+| 1 | 2026-03-14 | Project Bootstrap & v0.1 Core Implementation | `cc9945b`..`b60337f` |
+| 2 | 2026-03-14 | Examples & Bug Fixes | `2777258`..`c5a125a` |
+| 3 | 2026-03-14 | Publish v0.1.0 | `8fe3836`..`43f4952` |
+| 4 | 2026-03-15 | Multi-Client Peer Communication (v0.2) | `1251bc0`..`24336f6` |
 <!-- @@@/auto:session-history -->
 
 ---

@@ -1,0 +1,43 @@
+{
+  "id": "v01-core-sdk",
+  "name": "v01-core-sdk",
+  "title": "Implement AgentBridge SDK v0.1",
+  "description": "Bootstrap monorepo, implement shared protocol types, client SDK (BridgeClient, OfflineQueue, IIFE build), host SDK (AgentBridgeHost, Connection, IframeSandbox, InlineSandbox). Create 3 example demos. Fix capabilities handshake, race conditions, iframe sandbox issues. Publish v0.1.0 to npm.",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": null,
+  "priority": "P0",
+  "creator": "ziyu",
+  "assignee": "ziyu",
+  "createdAt": "2026-03-14",
+  "completedAt": "2026-03-14",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 4,
+  "next_action": [],
+  "commit": "43f4952",
+  "pr_url": null,
+  "subtasks": [
+    { "name": "Initialize monorepo with pnpm workspaces", "status": "completed" },
+    { "name": "Implement @agent_bridge/shared (protocol, guards, schema, errors)", "status": "completed" },
+    { "name": "Implement @agent_bridge/client (BridgeClient, OfflineQueue, Transport)", "status": "completed" },
+    { "name": "Implement @agent_bridge/host (Host, Connection, Transport, Sandboxes)", "status": "completed" },
+    { "name": "Add unit tests (39 tests)", "status": "completed" },
+    { "name": "Create examples (basic inline, iframe, LLM tool-calling)", "status": "completed" },
+    { "name": "Fix capabilities handshake and race conditions", "status": "completed" },
+    { "name": "Publish v0.1.0 to npm", "status": "completed" }
+  ],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "packages/shared/",
+    "packages/client/",
+    "packages/host/",
+    "examples/01-basic-inline/",
+    "examples/02-iframe-mode/",
+    "examples/03-llm-tool-calling/"
+  ],
+  "notes": "Published @agent_bridge/client@0.1.0 and @agent_bridge/host@0.1.0. npm user: liziyu1209, org: agent_bridge.",
+  "meta": {}
+}

@@ -16,17 +16,6 @@ Filling these guidelines is a one-time setup that pays off for every future AI s
 Fill in the guideline files based on your **existing codebase**.
 
 
-### Backend Guidelines
-
-| File | What to Document |
-|------|------------------|
-| `.trellis/spec/backend/directory-structure.md` | Where different file types go (routes, services, utils) |
-| `.trellis/spec/backend/database-guidelines.md` | ORM, migrations, query patterns, naming conventions |
-| `.trellis/spec/backend/error-handling.md` | How errors are caught, logged, and returned |
-| `.trellis/spec/backend/logging-guidelines.md` | Log levels, format, what to log |
-| `.trellis/spec/backend/quality-guidelines.md` | Code review standards, testing requirements |
-
-
 ### Frontend Guidelines
 
 | File | What to Document |
