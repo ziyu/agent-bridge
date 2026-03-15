@@ -1,64 +1,64 @@
 # AgentBridge
 
-轻量级 TypeScript SDK，让宿主应用挂载 AI 生成的子应用，并通过 `postMessage` 建立双向通信。
+[中文文档](./README.zh-CN.md)
 
-- `@agent_bridge/host` — 宿主端 SDK，负责挂载、通信、执行 action
-- `@agent_bridge/client` — 子应用端 SDK，零依赖，~1.7KB gzip
+Lightweight TypeScript SDK that lets host apps mount AI-generated guest apps and establish bidirectional communication via `postMessage`.
 
-## 安装
+- `@agent_bridge/host` — Host SDK: mount, communicate, execute actions, route peer messages
+- `@agent_bridge/client` — Client SDK: zero dependencies, ~1.7KB gzip
+
+## Install
 
 ```bash
-# 宿主应用
+# Host app
 npm install @agent_bridge/host
 
-# 子应用（iframe 模式需要独立安装）
+# Guest app (only needed for iframe URI mode)
 npm install @agent_bridge/client
 ```
 
-## 快速开始
+## Quick Start
 
-### 宿主端（Host）
+### Host
 
 ```typescript
 import { AgentBridgeHost, toOpenAITool } from '@agent_bridge/host';
 
 const host = new AgentBridgeHost();
 
-// 方式一：Inline 模式 — 注入代码到 iframe srcdoc
+// Inline mode — inject code into iframe srcdoc
 const conn = await host.mount(
   { type: 'raw', code: guestHtmlString, codeType: 'html' },
   { container: document.getElementById('sandbox') }
 );
 
-// 方式二：Iframe 模式 — 加载远程 URL
+// Or iframe mode — load remote URL
 const conn = await host.mount(
   { type: 'uri', url: 'https://guest-app.example.com' },
   { container: document.getElementById('sandbox') }
 );
 
-// 监听子应用注册的 capabilities
+// Listen for guest capabilities
 conn.on('capabilities', (caps) => {
-  console.log('可用 actions:', caps.map(c => c.name));
-  // 转换为 LLM tool-calling 格式
-  const tools = caps.map(toOpenAITool);
+  const tools = caps.map(toOpenAITool); // Also: toAnthropicTool, toGeminiTool
 });
 
-// 执行子应用的 action
+// Execute a guest action
 const result = await host.executeAction(conn.id, 'greet', { name: 'World' });
 
-// 监听通知和状态同步
+// Listen for notifications and state sync
 conn.on('notification', (evt) => console.log(evt.eventName, evt.eventData));
 conn.on('stateSync', (snapshot) => console.log(snapshot));
 ```
 
-### 子应用端（Client）
+### Guest (Client)
 
 ```typescript
 import { BridgeClient } from '@agent_bridge/client';
 
 const client = new BridgeClient();
 
-// 注册 action（可在 initialize 前后调用）
+// Register actions before initialize()
 client.registerAction(
   'greet',
   'Greet a person by name',
@@ -72,42 +72,86 @@ client.registerAction(
   (params) => ({ message: `Hello, ${params.name}!` })
 );
 
-// 建立连接
 await client.initialize();
 
-// 通知宿主 / 同步状态
 client.notifyHost('ready', { timestamp: Date.now() });
 client.syncState({ status: 'running' });
 ```
 
-> Inline 模式下，Client SDK 由宿主自动注入（IIFE: `@agent_bridge/client/dist/index.global.js`），子应用代码直接使用 `new AgentBridgeClient.BridgeClient()` 即可。
+> In inline mode, the Client SDK is auto-injected by the host (IIFE). Guest code uses `new AgentBridgeClient.BridgeClient()` directly — no import needed.
 
-## API 概览
+## Peer Communication
+
+Multiple guests mounted by the same host can discover each other and exchange messages. All peer messages are routed through the host (star topology).
+
+```typescript
+// Send direct message to another guest
+client.sendToPeer(targetConnectionId, 'chat', { text: 'Hello!' });
+
+// Broadcast to all other guests
+client.broadcast('update', { round: 2 });
+
+// Listen for peer messages
+client.onPeerMessage((msg) => {
+  console.log(`[${msg.topic}] from ${msg.from}:`, msg.payload);
+});
+
+// Listen for peer connect/disconnect
+client.onPeerChange((event, peer) => {
+  console.log(`Peer ${event}:`, peer.connectionId);
+});
+
+// Query connected peers
+const peers = await client.getPeers();
+```
+
+## API Reference
 
 ### @agent_bridge/host
 
-| API | 说明 |
-|-----|------|
-| `AgentBridgeHost.mount(source, config)` | 挂载子应用，返回 `Connection` |
-| `AgentBridgeHost.executeAction(connId, name, params)` | 调用子应用的 action |
-| `AgentBridgeHost.getCapabilities(connId)` | 获取子应用注册的 capabilities |
-| `AgentBridgeHost.unmount(connId)` | 卸载子应用 |
-| `Connection.on('capabilities', cb)` | 监听 capabilities 变更 |
-| `Connection.on('notification', cb)` | 监听子应用通知 |
-| `Connection.on('stateSync', cb)` | 监听状态同步 |
-| `toOpenAITool(schema)` | ActionSchema → OpenAI tool 格式 |
-| `toAnthropicTool(schema)` | ActionSchema → Anthropic tool 格式 |
-| `toGeminiTool(schema)` | ActionSchema → Gemini tool 格式 |
+| API | Description |
+|-----|-------------|
+| `host.mount(source, config)` | Mount a guest app, returns `Connection` |
+| `host.executeAction(connId, name, params)` | Invoke a guest action |
+| `host.getCapabilities(connId)` | Get registered capabilities |
+| `host.getAllCapabilities()` | Get capabilities across all connections |
+| `host.unmount(connId)` | Unmount a guest |
+| `host.getConnectedPeers(excludeId?)` | List connected peers |
+| `host.destroyAll()` | Tear down all connections |
+| `conn.on('capabilities', cb)` | Capabilities registered/updated |
+| `conn.on('notification', cb)` | Guest notification event |
+| `conn.on('stateSync', cb)` | Guest state snapshot |
+| `toOpenAITool(schema)` | Convert to OpenAI tool format |
+| `toAnthropicTool(schema)` | Convert to Anthropic tool format |
+| `toGeminiTool(schema)` | Convert to Gemini tool format |
 
 ### @agent_bridge/client
 
-| API | 说明 |
-|-----|------|
-| `BridgeClient.initialize()` | 与宿主建立连接 |
-| `BridgeClient.registerAction(name, desc, schema, cb)` | 注册可被宿主调用的 action |
-| `BridgeClient.notifyHost(event, data)` | 向宿主发送通知 |
-| `BridgeClient.syncState(snapshot)` | 同步状态快照到宿主 |
-| `BridgeClient.destroy()` | 断开连接 |
+| API | Description |
+|-----|-------------|
+| `client.initialize()` | Connect to host |
+| `client.registerAction(name, desc, schema, cb)` | Register a callable action |
+| `client.notifyHost(event, data, suggestion?)` | Send notification to host |
+| `client.syncState(snapshot)` | Push full state snapshot |
+| `client.sendToPeer(targetId, topic, payload)` | Direct message to a peer |
+| `client.broadcast(topic, payload)` | Message all peers |
+| `client.getPeers()` | List connected peers |
+| `client.onPeerMessage(handler)` | Subscribe to peer messages |
+| `client.onPeerChange(handler)` | Subscribe to peer connect/disconnect |
+| `client.destroy()` | Disconnect |
+
+## Examples
+
+```bash
+pnpm run examples   # Build and serve on port 3000
+```
+
+| Example | Description |
+|---------|-------------|
+| [01 - Basic Inline](examples/01-basic-inline/) | Inline mount with bidirectional actions |
+| [02 - Iframe Mode](examples/02-iframe-mode/) | Iframe mount with cross-origin isolation |
+| [03 - LLM Tool Calling](examples/03-llm-tool-calling/) | LLM tool-calling integration pattern |
+| [04 - Peer Communication](examples/04-peer-communication/) | Multi-client peer messaging and broadcast |
 
 ## License
 
