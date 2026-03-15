@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Host SDK for AgentBridge — mount and communicate with AI-generated guest apps via iframe or code injection",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziyu/agent-bridge.git",
+    "directory": "packages/host"
+  },
   "keywords": ["agent", "bridge", "iframe", "sandbox", "ai", "llm", "tool-calling", "postmessage"],
   "sideEffects": false,
   "main": "./dist/index.js",
