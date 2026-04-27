@@ -36,6 +36,9 @@ importers:
 
   packages/client:
     dependencies:
+      '@agent_bridge/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@agent_bridge/protocol':
         specifier: workspace:*
         version: link:../protocol

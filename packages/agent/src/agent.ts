@@ -5,6 +5,7 @@ import type {
   ActionSchema,
   NotificationEvent,
   PeerInfo,
+  AgentIdentityPayload,
 } from '@agent_bridge/protocol';
 import { BridgeError, NAMESPACE, isCallMessage } from '@agent_bridge/protocol';
 import { PeerConnection } from './connection.js';
@@ -12,12 +13,6 @@ import { PeerConnection } from './connection.js';
 type RegisteredAction = {
   schema: ActionSchema;
   callback: (params: Record<string, unknown>) => unknown | Promise<unknown>;
-};
-
-type PeerMessageEvent = {
-  from: string;
-  topic: string;
-  payload: Record<string, unknown>;
 };
 
 type ConnectionEvents = {
@@ -33,11 +28,16 @@ export class AgentBridgeAgent {
   private actions = new Map<string, RegisteredAction>();
   private connections = new Map<string, PeerConnection>();
   private participantId: string;
+  private identity: AgentIdentityPayload;
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
   private destroyed = false;
 
-  constructor(options?: { participantId?: string }) {
+  constructor(options?: { participantId?: string; name?: string; transports?: string[] }) {
     this.participantId = options?.participantId ?? this.generateId();
+    this.identity = {
+      name: options?.name ?? 'AgentBridgeAgent',
+      transports: options?.transports ?? [],
+    };
   }
 
   registerAction(
@@ -231,20 +231,15 @@ export class AgentBridgeAgent {
     });
 
     try {
-      await conn.connect(timeout);
+      await conn.connect({ timeout, identity: this.identity });
 
-      // Add CALL message handler — dispatches to registered actions
       transport.onMessage(async (msg) => {
         if (!isCallMessage(msg)) return;
         const action = this.actions.get(msg.actionName);
         if (!action) {
           transport.send({
-            type: 'REPLY',
-            namespace: NAMESPACE,
-            channel: conn.id,
-            timestamp: Date.now(),
-            callId: msg.id,
-            success: false,
+            type: 'REPLY', namespace: NAMESPACE, channel: conn.id,
+            timestamp: Date.now(), callId: msg.id, success: false,
             error: { code: 'ACTION_NOT_FOUND', message: `Action "${msg.actionName}" not registered` },
           });
           return;
@@ -252,26 +247,14 @@ export class AgentBridgeAgent {
         try {
           const value = await action.callback(msg.parameters);
           transport.send({
-            type: 'REPLY',
-            namespace: NAMESPACE,
-            channel: conn.id,
-            timestamp: Date.now(),
-            callId: msg.id,
-            success: true,
-            value,
+            type: 'REPLY', namespace: NAMESPACE, channel: conn.id,
+            timestamp: Date.now(), callId: msg.id, success: true, value,
           });
         } catch (err) {
           transport.send({
-            type: 'REPLY',
-            namespace: NAMESPACE,
-            channel: conn.id,
-            timestamp: Date.now(),
-            callId: msg.id,
-            success: false,
-            error: {
-              code: 'ACTION_EXECUTION_ERROR',
-              message: err instanceof Error ? err.message : String(err),
-            },
+            type: 'REPLY', namespace: NAMESPACE, channel: conn.id,
+            timestamp: Date.now(), callId: msg.id, success: false,
+            error: { code: 'ACTION_EXECUTION_ERROR', message: err instanceof Error ? err.message : String(err) },
           });
         }
       });

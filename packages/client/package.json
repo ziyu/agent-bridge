@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@agent_bridge/protocol": "workspace:*",
+    "@agent_bridge/agent": "workspace:*",
     "@agent_bridge/transport-postmessage": "workspace:*"
   },
   "devDependencies": {

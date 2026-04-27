@@ -5,7 +5,7 @@ import type {
   ConnectionState,
   ConnectionStateEvent,
   NotificationEvent,
-  PeerInfo,
+  AgentIdentityPayload,
 } from '@agent_bridge/protocol';
 import {
   NAMESPACE,
@@ -42,6 +42,7 @@ export class PeerConnection {
   private pending = new Map<string, PendingCall>();
   private participantId: string;
   private remoteParticipantId = '';
+  private remoteIdentity: AgentIdentityPayload | undefined;
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
   private getCapabilitiesSnapshot: () => ActionSchema[];
   private runtimeCleanup: (() => void) | null = null;
@@ -66,6 +67,10 @@ export class PeerConnection {
     return this.remoteParticipantId;
   }
 
+  getRemoteIdentity(): AgentIdentityPayload | undefined {
+    return this.remoteIdentity;
+  }
+
   getCapabilities(): ActionSchema[] {
     return [...this.capabilities];
   }
@@ -80,7 +85,7 @@ export class PeerConnection {
     return () => handlerSet.delete(h);
   }
 
-  async connect(timeout?: number): Promise<void> {
+  async connect(options?: { timeout?: number; identity?: AgentIdentityPayload }): Promise<void> {
     if (!this.transport) throw new BridgeError('CONNECTION_DESTROYED', 'Connection destroyed');
 
     this.setState('connecting');
@@ -90,10 +95,11 @@ export class PeerConnection {
       this.id,
       this.participantId,
       this.getCapabilitiesSnapshot,
-      timeout,
+      { timeout: options?.timeout, identity: options?.identity },
     );
 
     this.remoteParticipantId = result.remoteParticipantId;
+    this.remoteIdentity = result.remoteIdentity;
     this.capabilities = result.capabilities;
 
     this.setState('connected');

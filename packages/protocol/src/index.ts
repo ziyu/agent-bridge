@@ -23,6 +23,7 @@ export type {
   PeerInfo,
   BridgeMessage,
   BridgeMessageType,
+  AgentIdentityPayload,
   ConnectionState,
   ConnectionStateEvent,
   NotificationEvent,

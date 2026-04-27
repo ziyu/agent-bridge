@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AgentBridge - Universal Peer-to-Peer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; }
+    h1 { margin-bottom: 4px; }
+    p.desc { color: #666; margin-bottom: 24px; }
+    .peers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .card h2 { font-size: 14px; color: #666; margin-bottom: 8px; }
+    .card h3 { font-size: 16px; margin-bottom: 4px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot.connected { background: #16a34a; }
+    .dot.disconnected { background: #999; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    button { padding: 6px 14px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-size: 13px; }
+    button:hover { background: #f0f0f0; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    input { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; width: 120px; }
+    #log { font-family: monospace; font-size: 12px; max-height: 250px; overflow-y: auto; background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    #log div { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
+    .log-info { color: #2563eb; }
+    .log-success { color: #16a34a; }
+    .log-error { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <h1>05 - Universal Peer-to-Peer</h1>
+  <p class="desc">Two <code>AgentBridgeAgent</code> instances connected via <code>InMemoryTransport</code>. No iframes, no host — purely peer-to-peer via the universal protocol.</p>
+
+  <div class="peers">
+    <div class="card" id="card-a">
+      <h3><span class="dot disconnected" id="dot-a"></span> Agent A</h3>
+      <div class="controls">
+        <button class="primary" id="btn-call-a">Call greet on B</button>
+        <button id="btn-notify-a">Notify B</button>
+      </div>
+      <div><small id="state-a">Disconnected</small></div>
+    </div>
+    <div class="card" id="card-b">
+      <h3><span class="dot disconnected" id="dot-b"></span> Agent B</h3>
+      <div class="controls">
+        <button class="primary" id="btn-call-b">Call add on A</button>
+        <button id="btn-notify-b">Notify A</button>
+      </div>
+      <div><small id="state-b">Disconnected</small></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    import { AgentBridgeAgent } from '../../packages/agent/dist/index.mjs';
+    import { createMemoryTransportPair } from '../../packages/transport/memory/dist/index.mjs';
+
+    const log = document.getElementById('log');
+    function addLog(msg, cls = 'log-info') {
+      const d = document.createElement('div');
+      d.className = cls;
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(d);
+    }
+
+    const [t1, t2] = createMemoryTransportPair();
+    const agentA = new AgentBridgeAgent({ name: 'AgentA', transports: ['memory'] });
+    const agentB = new AgentBridgeAgent({ name: 'AgentB', transports: ['memory'] });
+
+    // B registers an action
+    agentB.registerAction('greet', 'Greet someone by name', {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'Name to greet' } },
+      required: ['name'],
+    }, (params) => {
+      const msg = `Hello, ${params.name}! (from B)`;
+      addLog(`B executed greet: "${msg}"`, 'log-success');
+      return { message: msg };
+    });
+
+    // A registers an action
+    agentA.registerAction('add', 'Add two numbers', {
+      type: 'object',
+      properties: {
+        a: { type: 'number', description: 'First number' },
+        b: { type: 'number', description: 'Second number' },
+      },
+      required: ['a', 'b'],
+    }, (params) => {
+      const result = (params.a as number) + (params.b as number);
+      addLog(`A executed add(${params.a}, ${params.b}) = ${result}`, 'log-success');
+      return { sum: result };
+    });
+
+    async function connect() {
+      await Promise.all([
+        agentA.acceptConnection(t1),
+        agentB.acceptConnection(t2),
+      ]);
+      document.getElementById('dot-a').classList.replace('disconnected', 'connected');
+      document.getElementById('dot-b').classList.replace('disconnected', 'connected');
+      document.getElementById('state-a').textContent = `Connected (peers: ${agentA.getPeers().length})`;
+      document.getElementById('state-b').textContent = `Connected (peers: ${agentB.getPeers().length})`;
+      addLog('Both agents connected via InMemoryTransport', 'log-success');
+    }
+
+    // A calls greet on B
+    document.getElementById('btn-call-a').addEventListener('click', async () => {
+      const [peer] = agentA.getPeers();
+      if (!peer) { addLog('No peers connected', 'log-error'); return; }
+      try {
+        const result = await agentA.executeAction(peer.connectionId, 'greet', { name: 'World' });
+        addLog(`A → B greet("World") → ${JSON.stringify(result)}`, 'log-success');
+      } catch (err) {
+        addLog(`A → B greet failed: ${err.message}`, 'log-error');
+      }
+    });
+
+    // B calls add on A
+    document.getElementById('btn-call-b').addEventListener('click', async () => {
+      const [peer] = agentB.getPeers();
+      if (!peer) { addLog('No peers connected', 'log-error'); return; }
+      try {
+        const result = await agentB.executeAction(peer.connectionId, 'add', { a: 3, b: 7 });
+        addLog(`B → A add(3,7) → ${JSON.stringify(result)}`, 'log-success');
+      } catch (err) {
+        addLog(`B → A add failed: ${err.message}`, 'log-error');
+      }
+    });
+
+    // A notifies B
+    document.getElementById('btn-notify-a').addEventListener('click', () => {
+      agentA.notifyPeers('hello', { from: 'A' }, 'Agent A says hello');
+      addLog('A sent notification to B', 'log-info');
+    });
+
+    // B notifies A
+    document.getElementById('btn-notify-b').addEventListener('click', () => {
+      agentB.notifyPeers('hello', { from: 'B' }, 'Agent B says hello back');
+      addLog('B sent notification to A', 'log-info');
+    });
+
+    // Subscribe to notifications
+    agentA.on('notification', (_connId, event) => {
+      addLog(`A received notification: "${event.eventName}" ${JSON.stringify(event.eventData)}`, 'log-info');
+    });
+    agentB.on('notification', (_connId, event) => {
+      addLog(`B received notification: "${event.eventName}" ${JSON.stringify(event.eventData)}`, 'log-info');
+    });
+
+    connect();
+  </script>
+</body>
+</html>

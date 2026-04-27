@@ -1,4 +1,4 @@
-import type { Transport, BridgeMessage, ActionSchema } from '@agent_bridge/protocol';
+import type { Transport, BridgeMessage, ActionSchema, AgentIdentityPayload } from '@agent_bridge/protocol';
 import {
   NAMESPACE,
   PROTOCOL_VERSION,
@@ -12,6 +12,7 @@ import {
 type HandshakeResult = {
   capabilities: ActionSchema[];
   remoteParticipantId: string;
+  remoteIdentity?: AgentIdentityPayload;
 };
 
 type Ack2Payload = { capabilities: ActionSchema[] };
@@ -21,11 +22,18 @@ export function handshake(
   channel: string,
   participantId: string,
   getCapabilitiesSnapshot: () => ActionSchema[],
-  timeout = DEFAULT_HANDSHAKE_TIMEOUT,
+  options?: {
+    timeout?: number;
+    identity?: AgentIdentityPayload;
+  },
 ): Promise<HandshakeResult> {
+  const timeout = options?.timeout ?? DEFAULT_HANDSHAKE_TIMEOUT;
+  const identity = options?.identity;
+
   return new Promise((resolve, reject) => {
     let resolved = false;
     let remoteParticipantId = '';
+    let remoteIdentity: AgentIdentityPayload | undefined;
 
     const timer = setTimeout(() => {
       cleanup();
@@ -35,6 +43,9 @@ export function handshake(
     const cleanupTransport = transport.onMessage((msg: BridgeMessage) => {
       if (isSynMessage(msg)) {
         remoteParticipantId = msg.participantId;
+        if (msg.identity) {
+          remoteIdentity = msg.identity;
+        }
         sendSyn();
 
         const isLeader = participantId > remoteParticipantId;
@@ -44,12 +55,13 @@ export function handshake(
       } else if (isAck1Message(msg)) {
         clearInterval(synInterval);
         sendAck2();
-        finish({ capabilities: [], remoteParticipantId });
+        finish({ capabilities: [], remoteParticipantId, remoteIdentity });
       } else if (isAck2Message(msg)) {
         clearInterval(synInterval);
         finish({
           capabilities: (msg as BridgeMessage & Ack2Payload).capabilities ?? [],
           remoteParticipantId,
+          remoteIdentity,
         });
       }
     });
@@ -68,14 +80,18 @@ export function handshake(
     }
 
     function sendSyn(): void {
-      transport.send({
+      const syn: BridgeMessage = {
         type: 'SYN',
         namespace: NAMESPACE,
         channel,
         timestamp: Date.now(),
         participantId,
         protocolVersion: PROTOCOL_VERSION,
-      });
+      };
+      if (identity) {
+        (syn as any).identity = identity;
+      }
+      transport.send(syn);
     }
 
     function sendAck1(): void {

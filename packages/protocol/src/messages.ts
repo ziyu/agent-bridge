@@ -38,7 +38,15 @@ export type SynMessage = MessageBase & {
   type: 'SYN';
   participantId: string;
   protocolVersion: string;
+  /** Optional agent identity for transport negotiation (protocol v1.1+) */
+  identity?: AgentIdentityPayload;
 };
+
+/** Lightweight identity carried in SYN for negotiation, not the full AgentIdentity type */
+export interface AgentIdentityPayload {
+  name: string;
+  transports: string[];
+}
 
 export type Ack1Message = MessageBase & {
   type: 'ACK1';
