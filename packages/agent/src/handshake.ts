@@ -1,0 +1,103 @@
+import type { Transport, BridgeMessage, ActionSchema } from '@agent_bridge/protocol';
+import {
+  NAMESPACE,
+  PROTOCOL_VERSION,
+  DEFAULT_HANDSHAKE_TIMEOUT,
+  BridgeError,
+  isSynMessage,
+  isAck1Message,
+  isAck2Message,
+} from '@agent_bridge/protocol';
+
+type HandshakeResult = {
+  capabilities: ActionSchema[];
+  remoteParticipantId: string;
+};
+
+type Ack2Payload = { capabilities: ActionSchema[] };
+
+export function handshake(
+  transport: Transport,
+  channel: string,
+  participantId: string,
+  getCapabilitiesSnapshot: () => ActionSchema[],
+  timeout = DEFAULT_HANDSHAKE_TIMEOUT,
+): Promise<HandshakeResult> {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+    let remoteParticipantId = '';
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new BridgeError('HANDSHAKE_TIMEOUT', `Handshake timed out after ${timeout}ms`));
+    }, timeout);
+
+    const cleanupTransport = transport.onMessage((msg: BridgeMessage) => {
+      if (isSynMessage(msg)) {
+        remoteParticipantId = msg.participantId;
+        sendSyn();
+
+        const isLeader = participantId > remoteParticipantId;
+        if (isLeader) {
+          sendAck1();
+        }
+      } else if (isAck1Message(msg)) {
+        clearInterval(synInterval);
+        sendAck2();
+        finish({ capabilities: [], remoteParticipantId });
+      } else if (isAck2Message(msg)) {
+        clearInterval(synInterval);
+        finish({
+          capabilities: (msg as BridgeMessage & Ack2Payload).capabilities ?? [],
+          remoteParticipantId,
+        });
+      }
+    });
+
+    function finish(result: HandshakeResult): void {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      cleanupTransport();
+      resolve(result);
+    }
+
+    function cleanup(): void {
+      clearInterval(synInterval);
+      cleanupTransport();
+    }
+
+    function sendSyn(): void {
+      transport.send({
+        type: 'SYN',
+        namespace: NAMESPACE,
+        channel,
+        timestamp: Date.now(),
+        participantId,
+        protocolVersion: PROTOCOL_VERSION,
+      });
+    }
+
+    function sendAck1(): void {
+      transport.send({
+        type: 'ACK1',
+        namespace: NAMESPACE,
+        channel,
+        timestamp: Date.now(),
+      });
+    }
+
+    function sendAck2(): void {
+      transport.send({
+        type: 'ACK2',
+        namespace: NAMESPACE,
+        channel,
+        timestamp: Date.now(),
+        capabilities: getCapabilitiesSnapshot(),
+      });
+    }
+
+    sendSyn();
+    const synInterval = setInterval(sendSyn, 100);
+  });
+}

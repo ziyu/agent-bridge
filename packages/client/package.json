@@ -45,7 +45,10 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@agent_bridge/protocol": "workspace:*",
+    "@agent_bridge/transport-postmessage": "workspace:*"
+  },
   "devDependencies": {
     "@agent_bridge/shared": "workspace:*"
   }

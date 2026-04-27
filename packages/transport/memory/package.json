@@ -1,8 +1,10 @@
 {
-  "name": "@agent_bridge/shared",
+  "name": "@agent_bridge/transport-memory",
   "version": "0.1.0",
   "private": true,
+  "description": "In-memory transport for AgentBridge — same-process agent communication, ideal for testing",
   "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

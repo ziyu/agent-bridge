@@ -1,4 +1,4 @@
-import type { ActionSchema } from './protocol.js';
+import type { ActionSchema } from '@agent_bridge/protocol';
 
 export function toOpenAITool(action: ActionSchema) {
   return {

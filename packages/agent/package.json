@@ -1,8 +1,10 @@
 {
-  "name": "@agent_bridge/shared",
+  "name": "@agent_bridge/agent",
   "version": "0.1.0",
   "private": true,
+  "description": "Universal AgentBridge Agent — transport-agnostic peer for agent-to-agent communication",
   "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -20,5 +22,8 @@
   },
   "dependencies": {
     "@agent_bridge/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@agent_bridge/transport-memory": "workspace:*"
   }
 }

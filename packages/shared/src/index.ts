@@ -1,4 +1,10 @@
-export { NAMESPACE, PROTOCOL_VERSION, DEFAULT_HANDSHAKE_TIMEOUT, DEFAULT_CALL_TIMEOUT } from './constants.js';
+export {
+  NAMESPACE,
+  PROTOCOL_VERSION,
+  DEFAULT_HANDSHAKE_TIMEOUT,
+  DEFAULT_CALL_TIMEOUT,
+} from '@agent_bridge/protocol';
+
 export type {
   ActionSchema,
   JSONSchemaProperty,
@@ -26,7 +32,15 @@ export type {
   Transport,
   MountSource,
   SandboxConfig,
-} from './protocol.js';
+  AgentIdentity,
+  TransportPreference,
+  CapabilitiesDeclaration,
+  ComplianceLevel,
+  MessageSerializer,
+  ConnectableTransport,
+  ListenableTransport,
+} from '@agent_bridge/protocol';
+
 export {
   isValidBridgeMessage,
   isSynMessage,
@@ -44,7 +58,12 @@ export {
   isPeerListRequest,
   isPeerListResponse,
   isPeerChangeNotification,
-} from './guards.js';
+  BridgeError,
+  JSONSerializer,
+  COMPLIANCE_REQUIREMENTS,
+} from '@agent_bridge/protocol';
+
+export type { BridgeErrorCode } from '@agent_bridge/protocol';
+
+// LLM converters (unique to shared — not part of core protocol)
 export { toOpenAITool, toAnthropicTool, toGeminiTool } from './schema.js';
-export { BridgeError } from './errors.js';
-export type { BridgeErrorCode } from './errors.js';

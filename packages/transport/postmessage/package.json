@@ -1,8 +1,10 @@
 {
-  "name": "@agent_bridge/shared",
+  "name": "@agent_bridge/transport-postmessage",
   "version": "0.1.0",
   "private": true,
+  "description": "Browser postMessage transport for AgentBridge — iframe sandbox communication via MessageChannel",
   "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

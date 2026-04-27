@@ -46,6 +46,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agent_bridge/shared": "workspace:*"
+    "@agent_bridge/protocol": "workspace:*",
+    "@agent_bridge/shared": "workspace:*",
+    "@agent_bridge/transport-postmessage": "workspace:*"
   }
 }
