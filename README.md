@@ -2,24 +2,49 @@
 
 [中文文档](./README.zh-CN.md)
 
-Lightweight TypeScript SDK that lets host apps mount AI-generated guest apps and establish bidirectional communication via `postMessage`.
+Universal agent-to-agent communication protocol. Connect AI agents across browsers, Node.js, and any runtime — via postMessage, WebSocket, stdio, or in-memory transport.
 
-- `@agent_bridge/host` — Host SDK: mount, communicate, execute actions, route peer messages
-- `@agent_bridge/client` — Client SDK: zero dependencies, ~1.7KB gzip
+## Packages
 
-## Install
-
-```bash
-# Host app
-npm install @agent_bridge/host
-
-# Guest app (only needed for iframe URI mode)
-npm install @agent_bridge/client
-```
+| Package | Description |
+|---------|-------------|
+| `@agent_bridge/protocol` | Pure protocol spec — message types, error codes, compliance levels, serialization. **Zero dependencies.** |
+| `@agent_bridge/agent` | Universal peer agent — transport-agnostic `AgentBridgeAgent` for any runtime |
+| `@agent_bridge/host` | Browser host SDK — mount iframe sandboxes, communicate with guest apps |
+| `@agent_bridge/client` | Browser client SDK — run inside iframe, register AI-callable actions (~1.7KB gzip) |
+| `@agent_bridge/transport-memory` | In‑memory transport — same‑process agent communication, ideal for testing |
+| `@agent_bridge/transport-postmessage` | Browser postMessage + MessageChannel transport |
+| `@agent_bridge/shared` | Convenience re‑exports + LLM tool‑format converters (OpenAI / Anthropic / Gemini) |
 
 ## Quick Start
 
-### Host
+### Universal Peer-to-Peer (no iframe, no host)
+
+```typescript
+import { AgentBridgeAgent } from '@agent_bridge/agent';
+import { createMemoryTransportPair } from '@agent_bridge/transport-memory';
+
+const [t1, t2] = createMemoryTransportPair();
+const agentA = new AgentBridgeAgent({ name: 'AgentA' });
+const agentB = new AgentBridgeAgent({ name: 'AgentB' });
+
+// Register actions on B
+agentB.registerAction('greet', 'Greet someone', {
+  type: 'object',
+  properties: { name: { type: 'string' } },
+  required: ['name'],
+}, (params) => ({ message: `Hello, ${params.name}!` }));
+
+// Connect both
+await Promise.all([agentA.acceptConnection(t1), agentB.acceptConnection(t2)]);
+
+// A calls B's action
+const [peer] = agentA.getPeers();
+const result = await agentA.executeAction(peer.connectionId, 'greet', { name: 'World' });
+// → { message: 'Hello, World!' }
+```
+
+### Browser Host + Guest
 
 ```typescript
 import { AgentBridgeHost, toOpenAITool } from '@agent_bridge/host';
@@ -32,80 +57,47 @@ const conn = await host.mount(
   { container: document.getElementById('sandbox') }
 );
 
-// Or iframe mode — load remote URL
-const conn = await host.mount(
-  { type: 'uri', url: 'https://guest-app.example.com' },
-  { container: document.getElementById('sandbox') }
-);
-
-// Listen for guest capabilities
-conn.on('capabilities', (caps) => {
-  const tools = caps.map(toOpenAITool); // Also: toAnthropicTool, toGeminiTool
-});
-
-// Execute a guest action
+conn.on('capabilities', (caps) => console.log(toOpenAITool(caps[0])));
 const result = await host.executeAction(conn.id, 'greet', { name: 'World' });
-
-// Listen for notifications and state sync
-conn.on('notification', (evt) => console.log(evt.eventName, evt.eventData));
-conn.on('stateSync', (snapshot) => console.log(snapshot));
 ```
-
-### Guest (Client)
 
 ```typescript
 import { BridgeClient } from '@agent_bridge/client';
 
 const client = new BridgeClient();
-
-// Register actions before initialize()
-client.registerAction(
-  'greet',
-  'Greet a person by name',
-  {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Name to greet' }
-    },
-    required: ['name'],
-  },
-  (params) => ({ message: `Hello, ${params.name}!` })
-);
+client.registerAction('greet', 'Greet a person', {
+  type: 'object', properties: { name: { type: 'string' } }, required: ['name'],
+}, (params) => ({ message: `Hello, ${params.name}!` }));
 
 await client.initialize();
-
 client.notifyHost('ready', { timestamp: Date.now() });
-client.syncState({ status: 'running' });
 ```
 
-> In inline mode, the Client SDK is auto-injected by the host (IIFE). Guest code uses `new AgentBridgeClient.BridgeClient()` directly — no import needed.
-
-## Peer Communication
-
-Multiple guests mounted by the same host can discover each other and exchange messages. All peer messages are routed through the host (star topology).
+### Peer Communication
 
 ```typescript
-// Send direct message to another guest
 client.sendToPeer(targetConnectionId, 'chat', { text: 'Hello!' });
-
-// Broadcast to all other guests
 client.broadcast('update', { round: 2 });
-
-// Listen for peer messages
-client.onPeerMessage((msg) => {
-  console.log(`[${msg.topic}] from ${msg.from}:`, msg.payload);
-});
-
-// Listen for peer connect/disconnect
-client.onPeerChange((event, peer) => {
-  console.log(`Peer ${event}:`, peer.connectionId);
-});
-
-// Query connected peers
-const peers = await client.getPeers();
+client.onPeerMessage((msg) => console.log(`[${msg.topic}] from ${msg.from}:`, msg.payload));
+client.onPeerChange((event, peer) => console.log(`Peer ${event}:`, peer.connectionId));
 ```
 
 ## API Reference
+
+### @agent_bridge/agent
+
+| API | Description |
+|-----|-------------|
+| `new AgentBridgeAgent(options?)` | Create an agent (optional `name`, `transports[]`) |
+| `agent.registerAction(name, desc, schema, cb)` | Register an AI-callable action |
+| `agent.acceptConnection(transport)` | Accept incoming connection, returns `PeerConnection` |
+| `agent.executeAction(connId, name, params)` | Invoke a remote action |
+| `agent.notifyPeers(event, data, suggestion?)` | Send notification to all peers |
+| `agent.syncState(snapshot)` | Push state snapshot to all peers |
+| `agent.sendToPeer(connId, topic, payload)` | Direct message to a peer |
+| `agent.broadcast(topic, payload)` | Broadcast to all peers |
+| `agent.getPeers()` | List connected peers |
+| `agent.destroy()` | Disconnect all peers |
 
 ### @agent_bridge/host
 
@@ -118,12 +110,6 @@ const peers = await client.getPeers();
 | `host.unmount(connId)` | Unmount a guest |
 | `host.getConnectedPeers(excludeId?)` | List connected peers |
 | `host.destroyAll()` | Tear down all connections |
-| `conn.on('capabilities', cb)` | Capabilities registered/updated |
-| `conn.on('notification', cb)` | Guest notification event |
-| `conn.on('stateSync', cb)` | Guest state snapshot |
-| `toOpenAITool(schema)` | Convert to OpenAI tool format |
-| `toAnthropicTool(schema)` | Convert to Anthropic tool format |
-| `toGeminiTool(schema)` | Convert to Gemini tool format |
 
 ### @agent_bridge/client
 
@@ -140,6 +126,14 @@ const peers = await client.getPeers();
 | `client.onPeerChange(handler)` | Subscribe to peer connect/disconnect |
 | `client.destroy()` | Disconnect |
 
+### LLM Tool Converters (from `@agent_bridge/shared`)
+
+| API | Description |
+|-----|-------------|
+| `toOpenAITool(schema)` | Convert action schema to OpenAI tool format |
+| `toAnthropicTool(schema)` | Convert to Anthropic tool format |
+| `toGeminiTool(schema)` | Convert to Gemini tool format |
+
 ## Examples
 
 ```bash
@@ -152,6 +146,15 @@ pnpm run examples   # Build and serve on port 3000
 | [02 - Iframe Mode](examples/02-iframe-mode/) | Iframe mount with cross-origin isolation |
 | [03 - LLM Tool Calling](examples/03-llm-tool-calling/) | LLM tool-calling integration pattern |
 | [04 - Peer Communication](examples/04-peer-communication/) | Multi-client peer messaging and broadcast |
+| [05 - Universal Peer](examples/05-universal-peer/) | Two `AgentBridgeAgent` via InMemoryTransport — no iframe |
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DESIGN.md](docs/DESIGN.md) | Original product requirements & architecture (v1.0) |
+| [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Detailed implementation plan with protocol specs |
+| [UNIVERSAL_PROTOCOL_DESIGN.md](docs/UNIVERSAL_PROTOCOL_DESIGN.md) | Evolution from host‑sandbox to universal protocol |
 
 ## License
 
